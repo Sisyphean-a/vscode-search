@@ -664,67 +664,9 @@ async function generateDetailedResult(
             return null;
         }
 
-        // 获取文件统计信息
-        const stats = await fs.promises.stat(filePath);
-        if (stats.size > config.maxFileSize) {
-            return null;
-        }
-
-        // 读取文件内容
-        const content = await fs.promises.readFile(filePath, 'utf-8');
-
-        // 检查是否包含所有关键词
-        if (!containsAllKeywords(content, keywords, config.caseSensitive)) {
-            return null;
-        }
-
-        // 获取工作区根路径
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            return null;
-        }
-
-        const workspaceRoot = workspaceFolders[0].uri.fsPath;
-        const relativePath = path.relative(workspaceRoot, filePath);
-
-        // 查找所有关键词的匹配位置
-        const lines = content.split('\n');
-        const matches = keywords.map(keyword => {
-            const positions: Array<{ line: number; column: number; lineText: string }> = [];
-
-            lines.forEach((line, lineIndex) => {
-                const searchText = config.caseSensitive ? line : line.toLowerCase();
-                const searchKeyword = config.caseSensitive ? keyword : keyword.toLowerCase();
-
-                let index = 0;
-                while ((index = searchText.indexOf(searchKeyword, index)) !== -1) {
-                    positions.push({
-                        line: lineIndex + 1,
-                        column: index + 1,
-                        lineText: line
-                    });
-                    index += searchKeyword.length;
-                }
-            });
-
-            return {
-                keyword,
-                positions
-            };
-        }).filter(match => match.positions.length > 0);
-
-        if (matches.length === 0) {
-            return null;
-        }
-
-        return {
-            filePath,
-            relativePath,
-            matches,
-            fileSize: stats.size,
-            lastModified: stats.mtime,
-            fileType: path.extname(filePath)
-        };
+        // 直接使用containsAllKeywords函数，它会返回完整的SearchResult（包括预览）
+        const result = await containsAllKeywords(filePath, keywords, config.caseSensitive);
+        return result;
     } catch (error) {
         console.error(`处理文件 ${filePath} 时出错:`, error);
         return null;

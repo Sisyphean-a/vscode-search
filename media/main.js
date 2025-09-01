@@ -69,7 +69,7 @@ let pageSize = 20; // 每页显示的文件数量
 let totalPages = 1;
 
 // 布局相关状态
-let isHorizontalLayout = true; // true: 左右布局, false: 上下布局
+let isHorizontalLayout = false; // true: 左右布局, false: 上下布局
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -131,134 +131,166 @@ function initializeElements() {
 
 function setupEventListeners() {
     // 搜索按钮点击
-    searchBtn.addEventListener('click', handleSearch);
-    
+    if (searchBtn) {
+        searchBtn.addEventListener('click', handleSearch);
+    }
+
     // 回车键搜索
-    keywordsInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && !isSearching) {
-            handleSearch();
-        }
-    });
-    
-    // 配置变化
-    caseSensitiveCheckbox.addEventListener('change', function() {
-        vscode.postMessage({
-            command: 'updateConfig',
-            config: {
-                caseSensitive: caseSensitiveCheckbox.checked
+    if (keywordsInput) {
+        keywordsInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !isSearching) {
+                handleSearch();
             }
         });
-    });
-    
+    }
+
+    // 配置变化
+    if (caseSensitiveCheckbox) {
+        caseSensitiveCheckbox.addEventListener('change', function() {
+            vscode.postMessage({
+                command: 'updateConfig',
+                config: {
+                    caseSensitive: caseSensitiveCheckbox.checked
+                }
+            });
+        });
+    }
+
     // 清除按钮
-    clearBtn.addEventListener('click', function() {
-        clearResults();
-        keywordsInput.value = '';
-        keywordsInput.focus();
-    });
-    
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            clearResults();
+            if (keywordsInput) {
+                keywordsInput.value = '';
+                keywordsInput.focus();
+            }
+        });
+    }
+
     // 配置按钮
-    configBtn.addEventListener('click', function() {
-        showConfigDialog();
-    });
-    
+    if (configBtn) {
+        configBtn.addEventListener('click', function() {
+            showConfigDialog();
+        });
+    }
+
     // 导出按钮
-    exportBtn.addEventListener('click', function() {
-        exportResults();
-    });
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function() {
+            exportResults();
+        });
+    }
 
     // 查看日志按钮
-    showLogBtn.addEventListener('click', function() {
-        vscode.postMessage({
-            command: 'showLog'
+    if (showLogBtn) {
+        showLogBtn.addEventListener('click', function() {
+            vscode.postMessage({
+                command: 'showLog'
+            });
         });
-    });
+    }
 
-    // 过滤功能事件监听器
-    toggleFilters.addEventListener('click', function() {
-        const isHidden = filterControls.classList.contains('hidden');
-        if (isHidden) {
-            filterControls.classList.remove('hidden');
-            this.textContent = '收起';
-        } else {
-            filterControls.classList.add('hidden');
-            this.textContent = '展开';
-        }
-    });
+    // 过滤功能事件监听器 - 移除toggleFilters功能，因为没有高级选项
 
-    applyFilters.addEventListener('click', function() {
-        applyCurrentFilters();
-    });
+    if (applyFilters) {
+        applyFilters.addEventListener('click', function() {
+            applyCurrentFilters();
+        });
+    }
 
-    clearFilters.addEventListener('click', function() {
-        clearAllFilters();
-    });
+    if (clearFilters) {
+        clearFilters.addEventListener('click', function() {
+            clearAllFilters();
+        });
+    }
 
     // 过滤器变化时自动应用
     [fileTypeFilter, fileSizeFilter, modifiedTimeFilter].forEach(filter => {
-        filter.addEventListener('change', function() {
-            applyCurrentFilters();
-        });
+        if (filter) {
+            filter.addEventListener('change', function() {
+                applyCurrentFilters();
+            });
+        }
     });
 
-    minMatchesFilter.addEventListener('input', function() {
-        // 延迟应用过滤，避免频繁更新
-        clearTimeout(this.filterTimeout);
-        this.filterTimeout = setTimeout(() => {
-            applyCurrentFilters();
-        }, 500);
-    });
+    if (minMatchesFilter) {
+        minMatchesFilter.addEventListener('input', function() {
+            // 延迟应用过滤，避免频繁更新
+            clearTimeout(this.filterTimeout);
+            this.filterTimeout = setTimeout(() => {
+                applyCurrentFilters();
+            }, 500);
+        });
+    }
 
     // 批量操作事件监听器
-    selectAllBtn.addEventListener('click', function() {
-        toggleSelectAll();
-    });
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            toggleSelectAll();
+        });
+    }
 
-    copySelectedBtn.addEventListener('click', function() {
-        copySelectedPaths();
-    });
+    if (copySelectedBtn) {
+        copySelectedBtn.addEventListener('click', function() {
+            copySelectedPaths();
+        });
+    }
 
-    openSelectedBtn.addEventListener('click', function() {
-        openSelectedFiles();
-    });
+    if (openSelectedBtn) {
+        openSelectedBtn.addEventListener('click', function() {
+            openSelectedFiles();
+        });
+    }
 
     // 布局切换按钮
-    layoutToggleBtn.addEventListener('click', function() {
-        isHorizontalLayout = !isHorizontalLayout;
-        updateLayoutToggleButton();
-        applyLayout();
-    });
+    if (layoutToggleBtn) {
+        layoutToggleBtn.addEventListener('click', function() {
+            isHorizontalLayout = !isHorizontalLayout;
+            updateLayoutToggleButton();
+            applyLayout();
+        });
+    }
 
     // 分页事件监听器
-    pageSizeSelect.addEventListener('change', function() {
-        pageSize = parseInt(this.value);
-        currentPage = 1;
-        updatePaginatedResults();
-    });
-
-    firstPageBtn.addEventListener('click', function() {
-        currentPage = 1;
-        updatePaginatedResults();
-    });
-
-    prevPageBtn.addEventListener('click', function() {
-        if (currentPage > 1) {
-            currentPage--;
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            pageSize = parseInt(this.value);
+            currentPage = 1;
             updatePaginatedResults();
-        }
-    });
+        });
+    }
 
-    nextPageBtn.addEventListener('click', function() {
-        if (currentPage < totalPages) {
-            currentPage++;
+    if (firstPageBtn) {
+        firstPageBtn.addEventListener('click', function() {
+            currentPage = 1;
             updatePaginatedResults();
-        }
-    });
+        });
+    }
 
-    lastPageBtn.addEventListener('click', function() {
-        currentPage = totalPages;
-        updatePaginatedResults();
-    });
+    if (prevPageBtn) {
+        prevPageBtn.addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                updatePaginatedResults();
+            }
+        });
+    }
+
+    if (nextPageBtn) {
+        nextPageBtn.addEventListener('click', function() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                updatePaginatedResults();
+            }
+        });
+    }
+
+    if (lastPageBtn) {
+        lastPageBtn.addEventListener('click', function() {
+            currentPage = totalPages;
+            updatePaginatedResults();
+        });
+    }
 
 
 }
@@ -594,23 +626,27 @@ function generateGroupedResultsHtml(groupedResults, keywords) {
 
             return `
                 <div class="result-item" data-file-path="${escapeHtml(result.filePath)}">
-                    <div class="result-file-header">
-                        <div class="result-file">
-                            <input type="checkbox" class="file-checkbox" data-file-path="${escapeHtml(result.filePath)}" title="选择文件">
-                            <span class="result-file-icon">${getFileIcon(result.relativePath)}</span>
-                            <span class="result-file-name">${escapeHtml(getFileName(result.relativePath))}</span>
-                            <span class="result-file-matches-count">(${totalFileMatches})</span>
+                    <div class="result-content">
+                        <div class="result-file-header">
+                            <div class="result-file">
+                                <input type="checkbox" class="file-checkbox" data-file-path="${escapeHtml(result.filePath)}" title="选择文件">
+                                <span class="result-file-icon">${getFileIcon(result.relativePath)}</span>
+                                <span class="result-file-name">${escapeHtml(getFileName(result.relativePath))}</span>
+                                <span class="result-file-matches-count">(${totalFileMatches})</span>
+                                <span class="result-file-path">${escapeHtml(result.relativePath)}</span>
+                            </div>
+                            <div class="result-actions">
+                                <button class="action-btn-small copy-path" title="复制路径" data-path="${escapeHtml(result.filePath)}">📋</button>
+                            </div>
                         </div>
-                        <div class="result-actions">
-                            <button class="action-btn-small copy-path" title="复制路径" data-path="${escapeHtml(result.filePath)}">📋</button>
+                        <div class="result-matches-and-info">
+                            <div class="result-matches">${matchesHtml}</div>
+                            <div class="result-file-info">
+                                <span>大小: ${fileSize}</span>
+                                ${lastModified ? `<span>修改: ${lastModified}</span>` : ''}
+                                ${result.fileType ? `<span>类型: ${result.fileType}</span>` : ''}
+                            </div>
                         </div>
-                    </div>
-                    <div class="result-file-path">${escapeHtml(result.relativePath)}</div>
-                    <div class="result-matches">${matchesHtml}</div>
-                    <div class="result-file-info">
-                        <span>大小: ${fileSize}</span>
-                        ${lastModified ? `<span>修改: ${lastModified}</span>` : ''}
-                        ${result.fileType ? `<span>类型: ${result.fileType}</span>` : ''}
                     </div>
                     <div class="result-preview hidden">
                         ${previewHtml}
@@ -980,7 +1016,9 @@ function toggleSelectAll() {
         // 取消全选
         selectedFiles.clear();
         isSelectAllMode = false;
-        selectAllBtn.textContent = '全选';
+        if (selectAllBtn) {
+            selectAllBtn.textContent = '全选';
+        }
     } else {
         // 全选
         selectedFiles.clear();
@@ -988,7 +1026,9 @@ function toggleSelectAll() {
             selectedFiles.add(result.filePath);
         });
         isSelectAllMode = true;
-        selectAllBtn.textContent = '取消全选';
+        if (selectAllBtn) {
+            selectAllBtn.textContent = '取消全选';
+        }
     }
 
     updateSelectionUI();
@@ -1083,9 +1123,12 @@ function togglePreview(resultItem) {
  */
 function updateSelectionUI() {
     // 更新所有复选框状态
-    searchResults.querySelectorAll('.file-checkbox').forEach(checkbox => {
+    const checkboxes = searchResults.querySelectorAll('.file-checkbox');
+
+    checkboxes.forEach(checkbox => {
         const filePath = checkbox.getAttribute('data-file-path');
-        checkbox.checked = selectedFiles.has(filePath);
+        const shouldBeChecked = selectedFiles.has(filePath);
+        checkbox.checked = shouldBeChecked;
     });
 }
 
@@ -1093,15 +1136,15 @@ function updateSelectionUI() {
  * 更新批量操作按钮状态
  */
 function updateBatchActionButtons() {
-    const selectedCount = selectedFiles.size;
+    const selectedFileCount = selectedFiles.size;
 
-    copySelectedBtn.disabled = selectedCount === 0;
-    openSelectedBtn.disabled = selectedCount === 0;
+    copySelectedBtn.disabled = selectedFileCount === 0;
+    openSelectedBtn.disabled = selectedFileCount === 0;
 
-    selectedCount.textContent = `已选择 ${selectedCount} 个文件`;
+    selectedCount.textContent = `已选择 ${selectedFileCount} 个文件`;
 
     // 显示或隐藏批量操作区域
-    if (selectedCount > 0 || filteredResults.length > 0) {
+    if (selectedFileCount > 0 || filteredResults.length > 0) {
         batchActions.classList.remove('hidden');
     } else {
         batchActions.classList.add('hidden');

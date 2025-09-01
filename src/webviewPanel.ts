@@ -222,10 +222,11 @@ export class SearchWebviewPanel {
                                     <option value="older">更早</option>
                                 </select>
                                 <input type="number" id="minMatchesFilter" class="filter-input-small" placeholder="最少匹配数" min="1">
+                                <button id="applyFilters" class="action-btn-small">应用</button>
                                 <button id="clearFilters" class="action-btn-small">清除</button>
-                                <button id="toggleFilters" class="action-btn-small">更多</button>
                             </div>
                         </div>
+
                     </div>
 
                     <div class="search-results" id="searchResults">
