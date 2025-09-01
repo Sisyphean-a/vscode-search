@@ -383,26 +383,111 @@ async function highlightKeywords(
 }
 
 /**
+ * 获取ripgrep可执行文件路径
+ */
+function getRipgrepPath(): string | null {
+    try {
+        // 尝试使用VSCode内置的ripgrep
+        const vscodeExtensionPath = vscode.extensions.getExtension('vscode.search-result')?.extensionPath;
+        if (vscodeExtensionPath) {
+            // 这个路径可能不准确，我们需要找到VSCode的安装路径
+        }
+
+        // 尝试常见的VSCode安装路径
+        const os = require('os');
+        const possiblePaths = [];
+
+        if (os.platform() === 'win32') {
+            const userProfile = os.homedir();
+            possiblePaths.push(
+                path.join(userProfile, 'AppData', 'Local', 'Programs', 'Microsoft VS Code', 'resources', 'app', 'node_modules', '@vscode', 'ripgrep', 'bin', 'rg.exe'),
+                path.join('C:', 'Program Files', 'Microsoft VS Code', 'resources', 'app', 'node_modules', '@vscode', 'ripgrep', 'bin', 'rg.exe'),
+                path.join('C:', 'Program Files (x86)', 'Microsoft VS Code', 'resources', 'app', 'node_modules', '@vscode', 'ripgrep', 'bin', 'rg.exe')
+            );
+        } else if (os.platform() === 'darwin') {
+            possiblePaths.push(
+                '/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules/@vscode/ripgrep/bin/rg'
+            );
+        } else {
+            // Linux
+            possiblePaths.push(
+                '/usr/share/code/resources/app/node_modules/@vscode/ripgrep/bin/rg',
+                '/opt/visual-studio-code/resources/app/node_modules/@vscode/ripgrep/bin/rg'
+            );
+        }
+
+        // 检查哪个路径存在
+        for (const ripgrepPath of possiblePaths) {
+            try {
+                if (require('fs').existsSync(ripgrepPath)) {
+                    return ripgrepPath;
+                }
+            } catch (error) {
+                // 继续尝试下一个路径
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('获取ripgrep路径失败:', error);
+        return null;
+    }
+}
+
+/**
  * 检查ripgrep是否可用
  */
-async function checkRipgrepAvailable(): Promise<boolean> {
+async function checkRipgrepAvailable(): Promise<{ available: boolean; path: string | null }> {
     return new Promise((resolve) => {
-        const child = spawn('rg', ['--version'], { shell: true });
+        // 首先尝试VSCode内置的ripgrep
+        const vscodeRipgrepPath = getRipgrepPath();
+        if (vscodeRipgrepPath) {
+            const child = spawn(vscodeRipgrepPath, ['--version']);
 
-        child.on('error', () => {
-            resolve(false);
-        });
+            child.on('error', () => {
+                // VSCode内置ripgrep失败，尝试系统ripgrep
+                trySystemRipgrep(resolve);
+            });
 
-        child.on('exit', (code) => {
-            resolve(code === 0);
-        });
+            child.on('exit', (code) => {
+                if (code === 0) {
+                    resolve({ available: true, path: vscodeRipgrepPath });
+                } else {
+                    trySystemRipgrep(resolve);
+                }
+            });
 
-        // 超时处理
-        setTimeout(() => {
-            child.kill();
-            resolve(false);
-        }, 3000);
+            // 超时处理
+            setTimeout(() => {
+                child.kill();
+                trySystemRipgrep(resolve);
+            }, 3000);
+        } else {
+            // 没找到VSCode内置ripgrep，尝试系统ripgrep
+            trySystemRipgrep(resolve);
+        }
     });
+}
+
+/**
+ * 尝试使用系统安装的ripgrep
+ */
+function trySystemRipgrep(resolve: (value: { available: boolean; path: string | null }) => void) {
+    const child = spawn('rg', ['--version'], { shell: true });
+
+    child.on('error', () => {
+        resolve({ available: false, path: null });
+    });
+
+    child.on('exit', (code) => {
+        resolve({ available: code === 0, path: 'rg' });
+    });
+
+    // 超时处理
+    setTimeout(() => {
+        child.kill();
+        resolve({ available: false, path: null });
+    }, 3000);
 }
 
 /**
@@ -411,7 +496,8 @@ async function checkRipgrepAvailable(): Promise<boolean> {
 async function searchWithRipgrep(
     keyword: string,
     workspaceRoot: string,
-    config: any
+    config: any,
+    ripgrepPath: string
 ): Promise<string[]> {
     return new Promise((resolve, reject) => {
         const args = [
@@ -443,7 +529,9 @@ async function searchWithRipgrep(
         args.push(keyword);
         args.push(workspaceRoot);
 
-        const child = spawn('rg', args, { shell: true });
+        // 使用指定的ripgrep路径
+        const spawnOptions = ripgrepPath === 'rg' ? { shell: true } : {};
+        const child = spawn(ripgrepPath, args, spawnOptions);
         let output = '';
         let errorOutput = '';
 
@@ -494,12 +582,14 @@ async function tryRipgrepSearch(
 ): Promise<SearchResult[] | null> {
     try {
         // 检查ripgrep是否可用
-        const isRipgrepAvailable = await checkRipgrepAvailable();
-        if (!isRipgrepAvailable) {
+        const ripgrepInfo = await checkRipgrepAvailable();
+        if (!ripgrepInfo.available || !ripgrepInfo.path) {
             return null;
         }
 
-        progress.report({ message: '使用ripgrep进行高性能搜索...', increment: 5 });
+        const ripgrepPath = ripgrepInfo.path;
+        const ripgrepType = ripgrepPath.includes('Microsoft VS Code') ? 'VSCode内置' : '系统';
+        progress.report({ message: `使用${ripgrepType}ripgrep进行高性能搜索...`, increment: 5 });
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -523,7 +613,7 @@ async function tryRipgrepSearch(
                 increment: 70 / keywords.length
             });
 
-            const files = await searchWithRipgrep(keyword, workspaceRoot, config);
+            const files = await searchWithRipgrep(keyword, workspaceRoot, config, ripgrepPath);
             keywordResults.set(keyword, new Set(files));
         }
 
