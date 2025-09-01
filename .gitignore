@@ -1,0 +1,32 @@
+# 编译输出
+out/
+dist/
+
+# 依赖
+node_modules/
+
+# 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# VSCode扩展特定
+*.vsix
+
+# 缓存
+.eslintcache
+.npm
+.cache
+
+# 环境变量文件
+.env
+.env.test
+
+# 临时文件
+tmp/
+temp/
+
+# 操作系统生成的文件
+.DS_Store
+Thumbs.db

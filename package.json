@@ -1,0 +1,136 @@
+{
+  "name": "vscode-keywords-intersection",
+  "displayName": "关键词交集搜索",
+  "description": "在VSCode中提供多关键词交集搜索功能，快速筛选同时包含所有关键词的文件",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "search",
+    "intersection",
+    "keywords",
+    "文件搜索",
+    "关键词"
+  ],
+  "activationEvents": [
+    "onCommand:intersectionSearch.searchKeywords"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "intersectionSearch.searchKeywords",
+        "title": "交集搜索: 搜索多个关键词",
+        "category": "交集搜索",
+        "icon": "$(search)"
+      },
+      {
+        "command": "intersectionSearch.openFile",
+        "title": "打开文件",
+        "category": "交集搜索"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "intersectionSearchResults",
+          "name": "关键词交集搜索结果",
+          "when": "intersectionSearch:hasResults"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "intersectionSearch.searchKeywords",
+          "when": "view == intersectionSearchResults",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "交集搜索",
+      "properties": {
+        "intersectionSearch.ignorePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/*.min.js",
+            "**/*.map"
+          ],
+          "description": "忽略搜索的文件或目录模式"
+        },
+        "intersectionSearch.caseSensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否区分大小写"
+        },
+        "intersectionSearch.maxFileSize": {
+          "type": "number",
+          "default": 1048576,
+          "description": "搜索文件的最大大小（字节），默认1MB"
+        },
+        "intersectionSearch.includePatterns": {
+          "type": "array",
+          "default": [
+            "**/*.js",
+            "**/*.ts",
+            "**/*.jsx",
+            "**/*.tsx",
+            "**/*.vue",
+            "**/*.html",
+            "**/*.css",
+            "**/*.scss",
+            "**/*.less",
+            "**/*.json",
+            "**/*.md",
+            "**/*.txt",
+            "**/*.py",
+            "**/*.java",
+            "**/*.c",
+            "**/*.cpp",
+            "**/*.h",
+            "**/*.php",
+            "**/*.rb",
+            "**/*.go",
+            "**/*.rs",
+            "**/*.xml",
+            "**/*.yaml",
+            "**/*.yml"
+          ],
+          "description": "包含在搜索中的文件模式"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "@vscode/test-electron": "^2.2.0",
+    "@vscode/vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "glob": "^8.0.3"
+  }
+}

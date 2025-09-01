@@ -1,0 +1,13 @@
+{
+  "name": "测试配置文件",
+  "description": "这个文件只包含项目名称，不包含项目代码",
+  "project": {
+    "title": "VSCode扩展项目名称",
+    "author": "开发者",
+    "category": "工具"
+  },
+  "settings": {
+    "enabled": true,
+    "version": "1.0.0"
+  }
+}
