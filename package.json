@@ -18,7 +18,8 @@
     "关键词"
   ],
   "activationEvents": [
-    "onCommand:intersectionSearch.searchKeywords"
+    "onCommand:intersectionSearch.searchKeywords",
+    "onCommand:intersectionSearch.openWebview"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -28,6 +29,12 @@
         "title": "交集搜索: 搜索多个关键词",
         "category": "交集搜索",
         "icon": "$(search)"
+      },
+      {
+        "command": "intersectionSearch.openWebview",
+        "title": "交集搜索: 打开搜索面板",
+        "category": "交集搜索",
+        "icon": "$(search-view)"
       },
       {
         "command": "intersectionSearch.openFile",

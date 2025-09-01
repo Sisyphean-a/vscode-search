@@ -1,0 +1,104 @@
+/* VSCode主题变量 */
+:root {
+	--vscode-font-family: var(--vscode-font-family);
+	--vscode-font-weight: var(--vscode-font-weight);
+	--vscode-font-size: var(--vscode-font-size);
+	--vscode-foreground: var(--vscode-foreground);
+	--vscode-background: var(--vscode-editor-background);
+	--vscode-button-background: var(--vscode-button-background);
+	--vscode-button-foreground: var(--vscode-button-foreground);
+	--vscode-button-hoverBackground: var(--vscode-button-hoverBackground);
+	--vscode-input-background: var(--vscode-input-background);
+	--vscode-input-foreground: var(--vscode-input-foreground);
+	--vscode-input-border: var(--vscode-input-border);
+	--vscode-input-placeholderForeground: var(--vscode-input-placeholderForeground);
+	--vscode-list-hoverBackground: var(--vscode-list-hoverBackground);
+	--vscode-list-activeSelectionBackground: var(--vscode-list-activeSelectionBackground);
+	--vscode-list-activeSelectionForeground: var(--vscode-list-activeSelectionForeground);
+	--vscode-progressBar-background: var(--vscode-progressBar-background);
+	--vscode-badge-background: var(--vscode-badge-background);
+	--vscode-badge-foreground: var(--vscode-badge-foreground);
+	--vscode-panel-border: var(--vscode-panel-border);
+	--vscode-checkbox-background: var(--vscode-checkbox-background);
+	--vscode-checkbox-foreground: var(--vscode-checkbox-foreground);
+	--vscode-checkbox-border: var(--vscode-checkbox-border);
+}
+
+body {
+	font-family: var(--vscode-font-family);
+	font-weight: var(--vscode-font-weight);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+	background-color: var(--vscode-background);
+	margin: 0;
+	padding: 0;
+}
+
+/* 按钮样式 */
+button {
+	background-color: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	padding: 6px 14px;
+	border-radius: 2px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: inherit;
+	transition: background-color 0.2s;
+}
+
+button:hover {
+	background-color: var(--vscode-button-hoverBackground);
+}
+
+button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* 输入框样式 */
+input[type="text"] {
+	background-color: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	padding: 6px 8px;
+	border-radius: 2px;
+	font-family: inherit;
+	font-size: inherit;
+	outline: none;
+}
+
+input[type="text"]:focus {
+	border-color: var(--vscode-focusBorder, #007acc);
+}
+
+input[type="text"]::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+
+/* 复选框样式 */
+input[type="checkbox"] {
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	background-color: var(--vscode-checkbox-background);
+	border: 1px solid var(--vscode-checkbox-border);
+	border-radius: 2px;
+	cursor: pointer;
+	position: relative;
+	margin-right: 6px;
+}
+
+input[type="checkbox"]:checked {
+	background-color: var(--vscode-checkbox-background);
+}
+
+input[type="checkbox"]:checked::after {
+	content: '✓';
+	position: absolute;
+	top: -2px;
+	left: 2px;
+	color: var(--vscode-checkbox-foreground);
+	font-size: 12px;
+	font-weight: bold;
+}

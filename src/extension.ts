@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { searchKeywordsIntersection, openFileAndHighlight } from './search';
 import { showSearchResults, showDetailedResults, SearchResultTreeProvider } from './resultView';
+import { SearchWebviewPanel } from './webviewPanel';
 
 /**
  * 扩展激活时调用
@@ -83,6 +84,11 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // 注册webview面板命令
+    const webviewCommand = vscode.commands.registerCommand('intersectionSearch.openWebview', () => {
+        SearchWebviewPanel.createOrShow(context.extensionUri, treeProvider);
+    });
+
     // 注册打开文件命令
     const openFileCommand = vscode.commands.registerCommand('intersectionSearch.openFile',
         async (filePath: string, keywords: string[], searchResult: any) => {
@@ -91,7 +97,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // 将命令添加到订阅列表
-    context.subscriptions.push(searchCommand, openFileCommand, treeView);
+    context.subscriptions.push(searchCommand, webviewCommand, openFileCommand, treeView);
 }
 
 /**
