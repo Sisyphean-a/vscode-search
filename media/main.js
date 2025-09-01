@@ -18,16 +18,66 @@ let clearBtn;
 let exportBtn;
 let showLogBtn;
 
+// 过滤相关元素
+let filterSection;
+let toggleFilters;
+let filterControls;
+let fileTypeFilter;
+let fileSizeFilter;
+let modifiedTimeFilter;
+let minMatchesFilter;
+let applyFilters;
+let clearFilters;
+
+// 批量操作相关元素
+let batchActions;
+let selectAllBtn;
+let copySelectedBtn;
+let openSelectedBtn;
+let layoutToggleBtn;
+let selectedCount;
+
+// 分页相关元素
+let paginationSection;
+let paginationInfo;
+let pageSizeSelect;
+let firstPageBtn;
+let prevPageBtn;
+let pageNumbers;
+let nextPageBtn;
+let lastPageBtn;
+
+
+
 // 状态
 let currentResults = [];
 let currentKeywords = [];
 let isSearching = false;
+let filteredResults = [];
+let activeFilters = {
+    fileType: '',
+    fileSize: '',
+    modifiedTime: '',
+    minMatches: 0
+};
+let selectedFiles = new Set();
+let isSelectAllMode = false;
+
+// 分页相关状态
+let currentPage = 1;
+let pageSize = 20; // 每页显示的文件数量
+let totalPages = 1;
+
+// 布局相关状态
+let isHorizontalLayout = true; // true: 左右布局, false: 上下布局
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializeElements();
     setupEventListeners();
     loadConfiguration();
+    updateLayoutToggleButton();
+    applyLayout();
 });
 
 function initializeElements() {
@@ -46,6 +96,37 @@ function initializeElements() {
     clearBtn = document.getElementById('clearBtn');
     exportBtn = document.getElementById('exportBtn');
     showLogBtn = document.getElementById('showLogBtn');
+
+    // 过滤相关元素
+    filterSection = document.getElementById('filterSection');
+    toggleFilters = document.getElementById('toggleFilters');
+    filterControls = document.getElementById('filterControls');
+    fileTypeFilter = document.getElementById('fileTypeFilter');
+    fileSizeFilter = document.getElementById('fileSizeFilter');
+    modifiedTimeFilter = document.getElementById('modifiedTimeFilter');
+    minMatchesFilter = document.getElementById('minMatchesFilter');
+    applyFilters = document.getElementById('applyFilters');
+    clearFilters = document.getElementById('clearFilters');
+
+    // 批量操作相关元素
+    batchActions = document.getElementById('batchActions');
+    selectAllBtn = document.getElementById('selectAllBtn');
+    copySelectedBtn = document.getElementById('copySelectedBtn');
+    openSelectedBtn = document.getElementById('openSelectedBtn');
+    layoutToggleBtn = document.getElementById('layoutToggleBtn');
+    selectedCount = document.getElementById('selectedCount');
+
+    // 分页相关元素
+    paginationSection = document.getElementById('paginationSection');
+    paginationInfo = document.getElementById('paginationInfo');
+    pageSizeSelect = document.getElementById('pageSizeSelect');
+    firstPageBtn = document.getElementById('firstPageBtn');
+    prevPageBtn = document.getElementById('prevPageBtn');
+    pageNumbers = document.getElementById('pageNumbers');
+    nextPageBtn = document.getElementById('nextPageBtn');
+    lastPageBtn = document.getElementById('lastPageBtn');
+
+
 }
 
 function setupEventListeners() {
@@ -92,6 +173,94 @@ function setupEventListeners() {
             command: 'showLog'
         });
     });
+
+    // 过滤功能事件监听器
+    toggleFilters.addEventListener('click', function() {
+        const isHidden = filterControls.classList.contains('hidden');
+        if (isHidden) {
+            filterControls.classList.remove('hidden');
+            this.textContent = '收起';
+        } else {
+            filterControls.classList.add('hidden');
+            this.textContent = '展开';
+        }
+    });
+
+    applyFilters.addEventListener('click', function() {
+        applyCurrentFilters();
+    });
+
+    clearFilters.addEventListener('click', function() {
+        clearAllFilters();
+    });
+
+    // 过滤器变化时自动应用
+    [fileTypeFilter, fileSizeFilter, modifiedTimeFilter].forEach(filter => {
+        filter.addEventListener('change', function() {
+            applyCurrentFilters();
+        });
+    });
+
+    minMatchesFilter.addEventListener('input', function() {
+        // 延迟应用过滤，避免频繁更新
+        clearTimeout(this.filterTimeout);
+        this.filterTimeout = setTimeout(() => {
+            applyCurrentFilters();
+        }, 500);
+    });
+
+    // 批量操作事件监听器
+    selectAllBtn.addEventListener('click', function() {
+        toggleSelectAll();
+    });
+
+    copySelectedBtn.addEventListener('click', function() {
+        copySelectedPaths();
+    });
+
+    openSelectedBtn.addEventListener('click', function() {
+        openSelectedFiles();
+    });
+
+    // 布局切换按钮
+    layoutToggleBtn.addEventListener('click', function() {
+        isHorizontalLayout = !isHorizontalLayout;
+        updateLayoutToggleButton();
+        applyLayout();
+    });
+
+    // 分页事件监听器
+    pageSizeSelect.addEventListener('change', function() {
+        pageSize = parseInt(this.value);
+        currentPage = 1;
+        updatePaginatedResults();
+    });
+
+    firstPageBtn.addEventListener('click', function() {
+        currentPage = 1;
+        updatePaginatedResults();
+    });
+
+    prevPageBtn.addEventListener('click', function() {
+        if (currentPage > 1) {
+            currentPage--;
+            updatePaginatedResults();
+        }
+    });
+
+    nextPageBtn.addEventListener('click', function() {
+        if (currentPage < totalPages) {
+            currentPage++;
+            updatePaginatedResults();
+        }
+    });
+
+    lastPageBtn.addEventListener('click', function() {
+        currentPage = totalPages;
+        updatePaginatedResults();
+    });
+
+
 }
 
 function handleSearch() {
@@ -201,6 +370,7 @@ window.addEventListener('message', event => {
         case 'configUpdated':
             handleConfigUpdated(message.success, message.message);
             break;
+
     }
 });
 
@@ -332,6 +502,11 @@ function handleConfigUpdated(success, message) {
 }
 
 function displayResults(results, keywords) {
+    // 保存当前结果
+    currentResults = results;
+    currentKeywords = keywords;
+    filteredResults = [...results];
+
     if (results.length === 0) {
         searchResults.innerHTML = `
             <div class="no-results">
@@ -349,19 +524,27 @@ function displayResults(results, keywords) {
             </div>
         `;
         searchStats.classList.add('hidden');
+        filterSection.classList.add('hidden');
         exportBtn.disabled = true;
         showLogBtn.disabled = true;
         return;
     }
+
+    // 显示过滤控件
+    filterSection.classList.remove('hidden');
 
     // 显示统计信息
     const totalMatches = results.reduce((sum, result) =>
         sum + result.matches.reduce((matchSum, match) => matchSum + match.positions.length, 0), 0
     );
 
-    statsText.textContent = `📊 找到 ${results.length} 个文件 (共 ${totalMatches} 处匹配)`;
+    updateStatsText(results.length, totalMatches);
     searchStats.classList.remove('hidden');
     exportBtn.disabled = false;
+
+    // 显示批量操作控件
+    batchActions.classList.remove('hidden');
+    updateBatchActionButtons();
 
     // 按目录分组显示结果
     const groupedResults = groupResultsByDirectory(results);
@@ -404,17 +587,34 @@ function generateGroupedResultsHtml(groupedResults, keywords) {
 
             const totalFileMatches = result.matches.reduce((sum, match) => sum + match.positions.length, 0);
             const fileSize = formatFileSize(result.fileSize || 0);
+            const lastModified = result.lastModified ? new Date(result.lastModified).toLocaleString() : '';
+
+            // 生成预览HTML
+            const previewHtml = generatePreviewHtml(result.preview);
 
             return `
                 <div class="result-item" data-file-path="${escapeHtml(result.filePath)}">
-                    <div class="result-file">
-                        <span class="result-file-icon">${getFileIcon(result.relativePath)}</span>
-                        <span class="result-file-name">${escapeHtml(getFileName(result.relativePath))}</span>
-                        <span class="result-file-matches-count">(${totalFileMatches})</span>
+                    <div class="result-file-header">
+                        <div class="result-file">
+                            <input type="checkbox" class="file-checkbox" data-file-path="${escapeHtml(result.filePath)}" title="选择文件">
+                            <span class="result-file-icon">${getFileIcon(result.relativePath)}</span>
+                            <span class="result-file-name">${escapeHtml(getFileName(result.relativePath))}</span>
+                            <span class="result-file-matches-count">(${totalFileMatches})</span>
+                        </div>
+                        <div class="result-actions">
+                            <button class="action-btn-small copy-path" title="复制路径" data-path="${escapeHtml(result.filePath)}">📋</button>
+                        </div>
                     </div>
                     <div class="result-file-path">${escapeHtml(result.relativePath)}</div>
                     <div class="result-matches">${matchesHtml}</div>
-                    <div class="result-file-info">大小: ${fileSize}</div>
+                    <div class="result-file-info">
+                        <span>大小: ${fileSize}</span>
+                        ${lastModified ? `<span>修改: ${lastModified}</span>` : ''}
+                        ${result.fileType ? `<span>类型: ${result.fileType}</span>` : ''}
+                    </div>
+                    <div class="result-preview hidden">
+                        ${previewHtml}
+                    </div>
                 </div>
             `;
         }).join('');
@@ -436,14 +636,58 @@ function generateGroupedResultsHtml(groupedResults, keywords) {
 }
 
 function addResultClickHandlers(keywords) {
+    // 移除原有的文件名点击事件，现在由文件头处理
+
+    // 文件项点击处理：单击预览，双击打开
     searchResults.querySelectorAll('.result-item').forEach(item => {
-        item.addEventListener('click', function() {
+        let clickTimer = null;
+
+        item.addEventListener('click', function(e) {
+            // 如果点击的是复选框或按钮，不处理
+            if (e.target.matches('.file-checkbox, .copy-path, button, input, select')) {
+                return;
+            }
+
+            e.stopPropagation();
+            const resultItem = this;
+
+            if (clickTimer) {
+                // 双击：打开文件
+                clearTimeout(clickTimer);
+                clickTimer = null;
+
+                const filePath = resultItem.getAttribute('data-file-path');
+                vscode.postMessage({
+                    command: 'openFile',
+                    filePath: filePath,
+                    keywords: keywords
+                });
+            } else {
+                // 单击：预览
+                clickTimer = setTimeout(() => {
+                    clickTimer = null;
+                    togglePreview(resultItem);
+                }, 250);
+            }
+        });
+    });
+
+    // 复制路径按钮
+    searchResults.querySelectorAll('.copy-path').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const path = this.getAttribute('data-path');
+            copyToClipboard(path);
+            showNotification('路径已复制到剪贴板', 'success');
+        });
+    });
+
+    // 文件复选框
+    searchResults.querySelectorAll('.file-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function(e) {
+            e.stopPropagation();
             const filePath = this.getAttribute('data-file-path');
-            vscode.postMessage({
-                command: 'openFile',
-                filePath: filePath,
-                keywords: keywords
-            });
+            handleFileSelection(filePath, this.checked);
         });
     });
 }
@@ -485,6 +729,513 @@ function formatFileSize(bytes) {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+/**
+ * 生成文件预览HTML
+ */
+function generatePreviewHtml(preview) {
+    if (!preview || !preview.snippets || preview.snippets.length === 0) {
+        return '<div class="preview-empty">暂无预览内容</div>';
+    }
+
+    const snippetsHtml = preview.snippets.map(snippet => {
+        return `
+            <div class="preview-snippet">
+                <div class="preview-snippet-header">
+                    <span class="preview-line-range">第 ${snippet.startLine}-${snippet.endLine} 行</span>
+                    <span class="preview-keywords">匹配: ${snippet.matchedKeywords.join(', ')}</span>
+                </div>
+                <div class="preview-content">
+                    <pre><code>${snippet.highlightedContent}</code></pre>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="preview-container">
+            <div class="preview-header">
+                <span class="preview-title">📄 文件预览</span>
+                <span class="preview-info">共 ${preview.totalLines} 行，显示 ${preview.snippets.length} 个片段</span>
+            </div>
+            <div class="preview-snippets">
+                ${snippetsHtml}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * 复制文本到剪贴板
+ */
+function copyToClipboard(text) {
+    // 使用VSCode API复制到剪贴板
+    vscode.postMessage({
+        command: 'copyToClipboard',
+        text: text
+    });
+}
+
+/**
+ * 应用当前过滤条件
+ */
+function applyCurrentFilters() {
+    if (currentResults.length === 0) {
+        return;
+    }
+
+    // 更新过滤条件
+    activeFilters.fileType = fileTypeFilter.value;
+    activeFilters.fileSize = fileSizeFilter.value;
+    activeFilters.modifiedTime = modifiedTimeFilter.value;
+    activeFilters.minMatches = parseInt(minMatchesFilter.value) || 0;
+
+    // 应用过滤
+    filteredResults = currentResults.filter(result => {
+        return passesAllFilters(result);
+    });
+
+    // 重新显示结果
+    displayFilteredResults(filteredResults, currentKeywords);
+}
+
+/**
+ * 清除所有过滤条件
+ */
+function clearAllFilters() {
+    fileTypeFilter.value = '';
+    fileSizeFilter.value = '';
+    modifiedTimeFilter.value = '';
+    minMatchesFilter.value = '';
+
+    activeFilters = {
+        fileType: '',
+        fileSize: '',
+        modifiedTime: '',
+        minMatches: 0
+    };
+
+    // 显示所有结果
+    filteredResults = [...currentResults];
+    displayFilteredResults(filteredResults, currentKeywords);
+}
+
+/**
+ * 检查结果是否通过所有过滤条件
+ */
+function passesAllFilters(result) {
+    // 文件类型过滤
+    if (activeFilters.fileType && result.fileType !== activeFilters.fileType) {
+        return false;
+    }
+
+    // 文件大小过滤
+    if (activeFilters.fileSize && !passesFileSizeFilter(result.fileSize, activeFilters.fileSize)) {
+        return false;
+    }
+
+    // 修改时间过滤
+    if (activeFilters.modifiedTime && !passesModifiedTimeFilter(result.lastModified, activeFilters.modifiedTime)) {
+        return false;
+    }
+
+    // 最少匹配数过滤
+    if (activeFilters.minMatches > 0) {
+        const totalMatches = result.matches.reduce((sum, match) => sum + match.positions.length, 0);
+        if (totalMatches < activeFilters.minMatches) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * 检查文件大小是否通过过滤条件
+ */
+function passesFileSizeFilter(fileSize, filterValue) {
+    const sizeInKB = fileSize / 1024;
+    const sizeInMB = sizeInKB / 1024;
+
+    switch (filterValue) {
+        case 'small':
+            return sizeInKB < 10;
+        case 'medium':
+            return sizeInKB >= 10 && sizeInKB < 100;
+        case 'large':
+            return sizeInKB >= 100 && sizeInMB < 1;
+        case 'xlarge':
+            return sizeInMB >= 1;
+        default:
+            return true;
+    }
+}
+
+/**
+ * 检查修改时间是否通过过滤条件
+ */
+function passesModifiedTimeFilter(lastModified, filterValue) {
+    if (!lastModified) {
+        return true;
+    }
+
+    const now = new Date();
+    const modifiedDate = new Date(lastModified);
+    const diffInDays = (now - modifiedDate) / (1000 * 60 * 60 * 24);
+
+    switch (filterValue) {
+        case 'today':
+            return diffInDays < 1;
+        case 'week':
+            return diffInDays < 7;
+        case 'month':
+            return diffInDays < 30;
+        case 'older':
+            return diffInDays >= 30;
+        default:
+            return true;
+    }
+}
+
+/**
+ * 显示过滤后的结果
+ */
+function displayFilteredResults(results, keywords) {
+    if (results.length === 0) {
+        searchResults.innerHTML = `
+            <div class="no-results">
+                <p>🔍 没有符合过滤条件的文件</p>
+                <p class="text-small margin-top-small opacity-80">尝试调整过滤条件或清除过滤器</p>
+            </div>
+        `;
+        updateStatsText(0, 0);
+        paginationSection.classList.add('hidden');
+        return;
+    }
+
+    // 计算统计信息
+    const totalMatches = results.reduce((sum, result) =>
+        sum + result.matches.reduce((matchSum, match) => matchSum + match.positions.length, 0), 0
+    );
+
+    // 更新统计信息
+    updateStatsText(results.length, totalMatches);
+
+    // 重置分页状态
+    currentPage = 1;
+
+    // 使用分页显示结果
+    updatePaginatedResults();
+}
+
+/**
+ * 更新统计文本
+ */
+function updateStatsText(fileCount, matchCount) {
+    const filterInfo = getActiveFilterInfo();
+    const baseText = `📊 找到 ${fileCount} 个文件 (共 ${matchCount} 处匹配)`;
+    statsText.textContent = filterInfo ? `${baseText} ${filterInfo}` : baseText;
+}
+
+/**
+ * 获取当前激活的过滤器信息
+ */
+function getActiveFilterInfo() {
+    const activeFilterNames = [];
+
+    if (activeFilters.fileType) {
+        activeFilterNames.push(`类型:${activeFilters.fileType}`);
+    }
+    if (activeFilters.fileSize) {
+        const sizeLabels = {
+            'small': '小文件',
+            'medium': '中等文件',
+            'large': '大文件',
+            'xlarge': '超大文件'
+        };
+        activeFilterNames.push(`大小:${sizeLabels[activeFilters.fileSize]}`);
+    }
+    if (activeFilters.modifiedTime) {
+        const timeLabels = {
+            'today': '今天',
+            'week': '本周',
+            'month': '本月',
+            'older': '更早'
+        };
+        activeFilterNames.push(`时间:${timeLabels[activeFilters.modifiedTime]}`);
+    }
+    if (activeFilters.minMatches > 0) {
+        activeFilterNames.push(`匹配≥${activeFilters.minMatches}`);
+    }
+
+    return activeFilterNames.length > 0 ? `[已过滤: ${activeFilterNames.join(', ')}]` : '';
+}
+
+/**
+ * 切换全选状态
+ */
+function toggleSelectAll() {
+    if (isSelectAllMode) {
+        // 取消全选
+        selectedFiles.clear();
+        isSelectAllMode = false;
+        selectAllBtn.textContent = '全选';
+    } else {
+        // 全选
+        selectedFiles.clear();
+        filteredResults.forEach(result => {
+            selectedFiles.add(result.filePath);
+        });
+        isSelectAllMode = true;
+        selectAllBtn.textContent = '取消全选';
+    }
+
+    updateSelectionUI();
+    updateBatchActionButtons();
+}
+
+/**
+ * 复制选中的文件路径
+ */
+function copySelectedPaths() {
+    if (selectedFiles.size === 0) {
+        showNotification('请先选择要复制的文件', 'warning');
+        return;
+    }
+
+    const paths = Array.from(selectedFiles);
+    const pathText = paths.join('\n');
+
+    copyToClipboard(pathText);
+    showNotification(`已复制 ${paths.length} 个文件路径到剪贴板`, 'success');
+}
+
+/**
+ * 打开选中的文件
+ */
+function openSelectedFiles() {
+    if (selectedFiles.size === 0) {
+        showNotification('请先选择要打开的文件', 'warning');
+        return;
+    }
+
+    if (selectedFiles.size > 10) {
+        if (!confirm(`确定要打开 ${selectedFiles.size} 个文件吗？这可能会影响性能。`)) {
+            return;
+        }
+    }
+
+    Array.from(selectedFiles).forEach(filePath => {
+        vscode.postMessage({
+            command: 'openFile',
+            filePath: filePath,
+            keywords: currentKeywords
+        });
+    });
+
+    showNotification(`正在打开 ${selectedFiles.size} 个文件...`, 'info');
+}
+
+/**
+ * 更新布局切换按钮文本
+ */
+function updateLayoutToggleButton() {
+    if (layoutToggleBtn) {
+        layoutToggleBtn.innerHTML = isHorizontalLayout ? '⚏ 上下' : '⚏ 左右';
+        layoutToggleBtn.title = isHorizontalLayout ? '切换到上下布局' : '切换到左右布局';
+    }
+}
+
+/**
+ * 应用布局样式
+ */
+function applyLayout() {
+    const searchResults = document.getElementById('searchResults');
+    if (searchResults) {
+        if (isHorizontalLayout) {
+            searchResults.classList.add('layout-horizontal');
+            searchResults.classList.remove('layout-vertical');
+        } else {
+            searchResults.classList.add('layout-vertical');
+            searchResults.classList.remove('layout-horizontal');
+        }
+    }
+}
+
+/**
+ * 切换文件预览
+ */
+function togglePreview(resultItem) {
+    const preview = resultItem.querySelector('.result-preview');
+    if (preview) {
+        const isHidden = preview.classList.contains('hidden');
+        if (isHidden) {
+            preview.classList.remove('hidden');
+        } else {
+            preview.classList.add('hidden');
+        }
+    }
+}
+
+/**
+ * 更新选择状态的UI
+ */
+function updateSelectionUI() {
+    // 更新所有复选框状态
+    searchResults.querySelectorAll('.file-checkbox').forEach(checkbox => {
+        const filePath = checkbox.getAttribute('data-file-path');
+        checkbox.checked = selectedFiles.has(filePath);
+    });
+}
+
+/**
+ * 更新批量操作按钮状态
+ */
+function updateBatchActionButtons() {
+    const selectedCount = selectedFiles.size;
+
+    copySelectedBtn.disabled = selectedCount === 0;
+    openSelectedBtn.disabled = selectedCount === 0;
+
+    selectedCount.textContent = `已选择 ${selectedCount} 个文件`;
+
+    // 显示或隐藏批量操作区域
+    if (selectedCount > 0 || filteredResults.length > 0) {
+        batchActions.classList.remove('hidden');
+    } else {
+        batchActions.classList.add('hidden');
+    }
+}
+
+/**
+ * 处理单个文件选择
+ */
+function handleFileSelection(filePath, isSelected) {
+    if (isSelected) {
+        selectedFiles.add(filePath);
+    } else {
+        selectedFiles.delete(filePath);
+        isSelectAllMode = false;
+        selectAllBtn.textContent = '全选';
+    }
+
+    updateBatchActionButtons();
+}
+
+/**
+ * 更新分页结果显示
+ */
+function updatePaginatedResults() {
+    if (filteredResults.length === 0) {
+        return;
+    }
+
+    // 计算分页信息
+    totalPages = Math.ceil(filteredResults.length / pageSize);
+    currentPage = Math.min(currentPage, totalPages);
+
+    // 获取当前页的结果
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredResults.length);
+    const pageResults = filteredResults.slice(startIndex, endIndex);
+
+    // 显示当前页结果
+    displayPageResults(pageResults, currentKeywords);
+
+    // 更新分页控件
+    updatePaginationControls();
+}
+
+/**
+ * 显示当前页的结果
+ */
+function displayPageResults(results, keywords) {
+    // 按目录分组显示结果
+    const groupedResults = groupResultsByDirectory(results);
+    const resultsHtml = generateGroupedResultsHtml(groupedResults, keywords);
+
+    searchResults.innerHTML = `<div class="results-list">${resultsHtml}</div>`;
+
+    // 添加点击事件
+    addResultClickHandlers(keywords);
+
+    // 更新选择状态
+    updateSelectionUI();
+}
+
+/**
+ * 更新分页控件状态
+ */
+function updatePaginationControls() {
+    // 更新分页信息
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, filteredResults.length);
+    paginationInfo.textContent = `第 ${currentPage} 页，共 ${totalPages} 页 (显示 ${startItem}-${endItem}，共 ${filteredResults.length} 项)`;
+
+    // 更新按钮状态
+    firstPageBtn.disabled = currentPage === 1;
+    prevPageBtn.disabled = currentPage === 1;
+    nextPageBtn.disabled = currentPage === totalPages;
+    lastPageBtn.disabled = currentPage === totalPages;
+
+    // 生成页码按钮
+    generatePageNumbers();
+
+    // 显示或隐藏分页控件
+    if (totalPages > 1) {
+        paginationSection.classList.remove('hidden');
+    } else {
+        paginationSection.classList.add('hidden');
+    }
+}
+
+/**
+ * 生成页码按钮
+ */
+function generatePageNumbers() {
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    // 调整起始页，确保显示足够的页码
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    let pageNumbersHtml = '';
+
+    // 添加省略号（如果需要）
+    if (startPage > 1) {
+        pageNumbersHtml += `<button class="page-number-btn" data-page="1">1</button>`;
+        if (startPage > 2) {
+            pageNumbersHtml += `<span class="page-ellipsis">...</span>`;
+        }
+    }
+
+    // 添加页码按钮
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === currentPage ? 'active' : '';
+        pageNumbersHtml += `<button class="page-number-btn ${isActive}" data-page="${i}">${i}</button>`;
+    }
+
+    // 添加省略号（如果需要）
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pageNumbersHtml += `<span class="page-ellipsis">...</span>`;
+        }
+        pageNumbersHtml += `<button class="page-number-btn" data-page="${totalPages}">${totalPages}</button>`;
+    }
+
+    pageNumbers.innerHTML = pageNumbersHtml;
+
+    // 添加页码按钮点击事件
+    pageNumbers.querySelectorAll('.page-number-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentPage = parseInt(this.getAttribute('data-page'));
+            updatePaginatedResults();
+        });
+    });
 }
 
 function escapeHtml(text) {
@@ -694,10 +1445,14 @@ function addKeyboardShortcuts() {
     });
 }
 
+
+
 // 在初始化时添加键盘快捷键
 document.addEventListener('DOMContentLoaded', function() {
     initializeElements();
     setupEventListeners();
     loadConfiguration();
     addKeyboardShortcuts();
+
+
 });

@@ -82,6 +82,10 @@ export class SearchWebviewPanel {
                     case 'showLog':
                         await this._handleShowLog();
                         break;
+                    case 'copyToClipboard':
+                        await this._handleCopyToClipboard(message.text);
+                        break;
+
                 }
             },
             null,
@@ -172,13 +176,81 @@ export class SearchWebviewPanel {
                     </div>
 
                     <div class="search-stats hidden" id="searchStats">
-                        <span id="statsText">找到 0 个文件</span>
+                        <div class="stats-compact-row">
+                            <span id="statsText">找到 0 个文件</span>
+                            <div class="batch-actions-inline" id="batchActions">
+                                <button id="selectAllBtn" class="action-btn-small">全选</button>
+                                <button id="copySelectedBtn" class="action-btn-small" disabled>复制选中路径</button>
+                                <button id="openSelectedBtn" class="action-btn-small" disabled>打开选中文件</button>
+                                <button id="layoutToggleBtn" class="action-btn-small" title="切换布局">⚏ 左右</button>
+                                <span id="selectedCount" class="selected-count">已选择 0 个文件</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-section hidden" id="filterSection">
+                        <div class="filter-header">
+                            <span class="filter-title">🔍 过滤结果</span>
+                            <div class="filter-quick-actions">
+                                <select id="fileTypeFilter" class="filter-select-small">
+                                    <option value="">文件类型</option>
+                                    <option value=".js">JavaScript</option>
+                                    <option value=".ts">TypeScript</option>
+                                    <option value=".jsx">React JSX</option>
+                                    <option value=".tsx">React TSX</option>
+                                    <option value=".vue">Vue</option>
+                                    <option value=".html">HTML</option>
+                                    <option value=".css">CSS</option>
+                                    <option value=".scss">SCSS</option>
+                                    <option value=".json">JSON</option>
+                                    <option value=".md">Markdown</option>
+                                    <option value=".py">Python</option>
+                                    <option value=".java">Java</option>
+                                </select>
+                                <select id="fileSizeFilter" class="filter-select-small">
+                                    <option value="">文件大小</option>
+                                    <option value="small">< 10KB</option>
+                                    <option value="medium">10KB-100KB</option>
+                                    <option value="large">100KB-1MB</option>
+                                    <option value="xlarge">> 1MB</option>
+                                </select>
+                                <select id="modifiedTimeFilter" class="filter-select-small">
+                                    <option value="">修改时间</option>
+                                    <option value="today">今天</option>
+                                    <option value="week">本周</option>
+                                    <option value="month">本月</option>
+                                    <option value="older">更早</option>
+                                </select>
+                                <input type="number" id="minMatchesFilter" class="filter-input-small" placeholder="最少匹配数" min="1">
+                                <button id="clearFilters" class="action-btn-small">清除</button>
+                                <button id="toggleFilters" class="action-btn-small">更多</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="search-results" id="searchResults">
                         <div class="no-results" id="noResults">
                             <p>💡 输入关键词开始搜索</p>
                             <p class="text-small margin-top-small opacity-70">支持多个关键词，用空格分隔</p>
+                        </div>
+                    </div>
+
+                    <div class="pagination-section hidden" id="paginationSection">
+                        <div class="pagination-info">
+                            <span id="paginationInfo">第 1 页，共 1 页</span>
+                            <select id="pageSizeSelect" class="page-size-select">
+                                <option value="10">每页 10 项</option>
+                                <option value="20" selected>每页 20 项</option>
+                                <option value="50">每页 50 项</option>
+                                <option value="100">每页 100 项</option>
+                            </select>
+                        </div>
+                        <div class="pagination-controls">
+                            <button id="firstPageBtn" class="pagination-btn" disabled>⏮️</button>
+                            <button id="prevPageBtn" class="pagination-btn" disabled>⬅️</button>
+                            <div class="page-numbers" id="pageNumbers"></div>
+                            <button id="nextPageBtn" class="pagination-btn" disabled>➡️</button>
+                            <button id="lastPageBtn" class="pagination-btn" disabled>⏭️</button>
                         </div>
                     </div>
 
@@ -189,6 +261,7 @@ export class SearchWebviewPanel {
                             <button id="exportBtn" class="action-btn" disabled>📤 导出结果</button>
                             <button id="showLogBtn" class="action-btn" disabled>📋 查看日志</button>
                         </div>
+
                         <div class="keyboard-shortcuts">
                             <span class="shortcut">Ctrl+Enter</span> 搜索 |
                             <span class="shortcut">Ctrl+K</span> 聚焦 |
@@ -368,6 +441,17 @@ export class SearchWebviewPanel {
             vscode.window.showErrorMessage('配置保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
         }
     }
+
+    private async _handleCopyToClipboard(text: string) {
+        try {
+            await vscode.env.clipboard.writeText(text);
+        } catch (error) {
+            console.error('复制到剪贴板失败:', error);
+            vscode.window.showErrorMessage('复制失败: ' + (error instanceof Error ? error.message : '未知错误'));
+        }
+    }
+
+
 
     private async _handleShowLog() {
         // 显示现有的输出面板
