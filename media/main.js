@@ -16,6 +16,7 @@ let noResults;
 let configBtn;
 let clearBtn;
 let exportBtn;
+let showLogBtn;
 
 // 状态
 let currentResults = [];
@@ -44,6 +45,7 @@ function initializeElements() {
     configBtn = document.getElementById('configBtn');
     clearBtn = document.getElementById('clearBtn');
     exportBtn = document.getElementById('exportBtn');
+    showLogBtn = document.getElementById('showLogBtn');
 }
 
 function setupEventListeners() {
@@ -83,6 +85,13 @@ function setupEventListeners() {
     exportBtn.addEventListener('click', function() {
         exportResults();
     });
+
+    // 查看日志按钮
+    showLogBtn.addEventListener('click', function() {
+        vscode.postMessage({
+            command: 'showLog'
+        });
+    });
 }
 
 function handleSearch() {
@@ -107,31 +116,29 @@ function handleSearch() {
 function showError(message) {
     // 简单的错误显示
     const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #f44336;
-        color: white;
-        padding: 12px 16px;
-        border-radius: 4px;
-        z-index: 1000;
-        font-size: 14px;
-    `;
+    errorDiv.className = 'error-toast';
     errorDiv.textContent = message;
     document.body.appendChild(errorDiv);
-    
+
     setTimeout(() => {
-        document.body.removeChild(errorDiv);
+        if (document.body.contains(errorDiv)) {
+            document.body.removeChild(errorDiv);
+        }
     }, 3000);
 }
 
 function clearResults() {
     currentResults = [];
     currentKeywords = [];
-    searchResults.innerHTML = '<div class="no-results" id="noResults"><p>输入关键词开始搜索</p></div>';
-    searchStats.style.display = 'none';
+    searchResults.innerHTML = `
+        <div class="no-results" id="noResults">
+            <p>💡 输入关键词开始搜索</p>
+            <p class="text-small margin-top-small opacity-70">支持多个关键词，用空格分隔</p>
+        </div>
+    `;
+    searchStats.classList.add('hidden');
     exportBtn.disabled = true;
+    showLogBtn.disabled = true;
 }
 
 function loadConfiguration() {
@@ -203,10 +210,10 @@ function handleSearchStarted(keywords) {
     searchBtn.disabled = true;
     searchBtn.innerHTML = '🔍 搜索中...';
     searchBtn.classList.add('searching');
-    searchProgress.style.display = 'block';
-    searchStats.style.display = 'none';
+    searchProgress.classList.remove('hidden');
+    searchStats.classList.add('hidden');
     progressFill.style.width = '0%';
-    progressText.textContent = '正在搜索...';
+    progressText.textContent = '初始化搜索...';
 
     // 添加搜索动画效果
     keywordsInput.style.borderColor = 'var(--vscode-progressBar-background, #0e70c0)';
@@ -222,12 +229,40 @@ function handleSearchStarted(keywords) {
 
 function handleSearchProgress(progress) {
     if (progress.message) {
-        progressText.textContent = progress.message;
+        // 优化进度文案显示
+        let displayMessage = progress.message;
+        if (displayMessage.includes('正在扫描文件')) {
+            displayMessage = '📂 ' + displayMessage;
+        } else if (displayMessage.includes('正在搜索')) {
+            displayMessage = '🔍 ' + displayMessage;
+        } else if (displayMessage.includes('处理')) {
+            displayMessage = '⚡ ' + displayMessage;
+        }
+        progressText.textContent = displayMessage;
     }
     if (progress.increment !== undefined) {
         const currentWidth = parseFloat(progressFill.style.width) || 0;
         const newWidth = Math.min(100, currentWidth + progress.increment);
         progressFill.style.width = newWidth + '%';
+
+        // 根据进度显示不同的状态
+        if (newWidth < 30) {
+            if (!progress.message) {
+                progressText.textContent = '📂 扫描文件中...';
+            }
+        } else if (newWidth < 70) {
+            if (!progress.message) {
+                progressText.textContent = '🔍 分析文件内容...';
+            }
+        } else if (newWidth < 95) {
+            if (!progress.message) {
+                progressText.textContent = '⚡ 整理搜索结果...';
+            }
+        } else {
+            if (!progress.message) {
+                progressText.textContent = '✅ 搜索完成';
+            }
+        }
     }
 }
 
@@ -239,7 +274,7 @@ function handleSearchCompleted(results, keywords) {
     searchBtn.disabled = false;
     searchBtn.innerHTML = '🔍 搜索';
     searchBtn.classList.remove('searching');
-    searchProgress.style.display = 'none';
+    searchProgress.classList.add('hidden');
 
     // 恢复输入框样式
     keywordsInput.style.borderColor = '';
@@ -249,14 +284,31 @@ function handleSearchCompleted(results, keywords) {
     // 显示完成通知
     if (results.length > 0) {
         showNotification(`找到 ${results.length} 个匹配文件`, 'success');
+        showLogBtn.disabled = false; // 有结果时启用查看日志按钮
+    } else {
+        showLogBtn.disabled = true;
     }
 }
 
 function handleSearchError(message) {
     isSearching = false;
     searchBtn.disabled = false;
-    searchBtn.textContent = '搜索';
-    searchProgress.style.display = 'none';
+    searchBtn.innerHTML = '🔍 搜索';
+    searchBtn.classList.remove('searching');
+    searchProgress.classList.add('hidden');
+
+    // 恢复输入框样式
+    keywordsInput.style.borderColor = '';
+
+    // 显示错误状态
+    searchResults.innerHTML = `
+        <div class="no-results">
+            <p>❌ 搜索失败</p>
+            <p class="text-small margin-top-small text-error">${escapeHtml(message)}</p>
+            <p class="text-small margin-top-small opacity-70">请检查关键词或重试</p>
+        </div>
+    `;
+
     showError(message);
 }
 
@@ -283,20 +335,22 @@ function displayResults(results, keywords) {
     if (results.length === 0) {
         searchResults.innerHTML = `
             <div class="no-results">
-                <p>没有找到同时包含所有关键词的文件</p>
-                <p style="font-size: 12px; margin-top: 8px;">关键词: [${keywords.join(', ')}]</p>
-                <div style="margin-top: 12px; font-size: 12px; color: var(--vscode-foreground); opacity: 0.7;">
-                    <p>建议:</p>
-                    <ul style="margin-left: 16px; margin-top: 4px;">
-                        <li>• 检查关键词拼写</li>
+                <p>🔍 未找到匹配的文件</p>
+                <p class="text-small margin-top-small opacity-80">搜索关键词: [${escapeHtml(keywords.join(', '))}]</p>
+                <div class="margin-top-medium text-small opacity-70">
+                    <p>💡 建议:</p>
+                    <ul class="margin-left-medium margin-top-tiny">
+                        <li>• 检查关键词拼写是否正确</li>
                         <li>• 尝试减少关键词数量</li>
                         <li>• 检查文件类型配置</li>
+                        <li>• 确认文件在工作区范围内</li>
                     </ul>
                 </div>
             </div>
         `;
-        searchStats.style.display = 'none';
+        searchStats.classList.add('hidden');
         exportBtn.disabled = true;
+        showLogBtn.disabled = true;
         return;
     }
 
@@ -306,7 +360,7 @@ function displayResults(results, keywords) {
     );
 
     statsText.textContent = `📊 找到 ${results.length} 个文件 (共 ${totalMatches} 处匹配)`;
-    searchStats.style.display = 'block';
+    searchStats.classList.remove('hidden');
     exportBtn.disabled = false;
 
     // 按目录分组显示结果
@@ -444,6 +498,12 @@ function getFileName(path) {
 }
 
 function showConfigDialog() {
+    // 检查是否已经存在对话框
+    const existingDialog = document.querySelector('.config-dialog-overlay');
+    if (existingDialog) {
+        return; // 如果已经存在，直接返回
+    }
+
     // 创建配置对话框
     const dialog = document.createElement('div');
     dialog.className = 'config-dialog-overlay';
@@ -495,24 +555,69 @@ function showConfigDialog() {
         command: 'getConfig'
     });
 
-    // 添加事件监听器
-    document.getElementById('configDialogClose').addEventListener('click', closeConfigDialog);
-    document.getElementById('configDialogCancel').addEventListener('click', closeConfigDialog);
-    document.getElementById('configDialogSave').addEventListener('click', saveConfig);
-    document.getElementById('configDialogReset').addEventListener('click', resetConfig);
+    // 使用setTimeout确保DOM元素完全添加后再绑定事件
+    setTimeout(() => {
+        // 添加事件监听器
+        const closeBtn = document.getElementById('configDialogClose');
+        const cancelBtn = document.getElementById('configDialogCancel');
+        const saveBtn = document.getElementById('configDialogSave');
+        const resetBtn = document.getElementById('configDialogReset');
 
-    // 点击遮罩层关闭
-    dialog.addEventListener('click', function(e) {
-        if (e.target === dialog) {
-            closeConfigDialog();
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('关闭按钮被点击');
+                closeConfigDialog();
+            });
         }
-    });
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('取消按钮被点击');
+                closeConfigDialog();
+            });
+        }
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('保存按钮被点击');
+                saveConfig();
+            });
+        }
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('重置按钮被点击');
+                resetConfig();
+            });
+        }
+
+        // 点击遮罩层关闭
+        dialog.addEventListener('click', function(e) {
+            if (e.target === dialog) {
+                closeConfigDialog();
+            }
+        });
+    }, 0);
 }
 
 function closeConfigDialog() {
+    console.log('closeConfigDialog 被调用');
     const dialog = document.querySelector('.config-dialog-overlay');
-    if (dialog) {
-        document.body.removeChild(dialog);
+    console.log('找到的对话框元素:', dialog);
+    if (dialog && document.body.contains(dialog)) {
+        try {
+            document.body.removeChild(dialog);
+            console.log('配置对话框已关闭');
+        } catch (error) {
+            console.error('关闭配置对话框时出错:', error);
+        }
+    } else {
+        console.log('没有找到配置对话框或对话框不在DOM中');
     }
 }
 

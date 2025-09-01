@@ -1,6 +1,31 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { SearchResult, formatFileSize } from './utils';
+
+// 全局输出通道管理器
+export class OutputChannelManager {
+    private static instance: OutputChannelManager;
+    private outputChannel: vscode.OutputChannel;
+
+    private constructor() {
+        this.outputChannel = vscode.window.createOutputChannel('关键词交集搜索');
+    }
+
+    public static getInstance(): OutputChannelManager {
+        if (!OutputChannelManager.instance) {
+            OutputChannelManager.instance = new OutputChannelManager();
+        }
+        return OutputChannelManager.instance;
+    }
+
+    public getChannel(): vscode.OutputChannel {
+        return this.outputChannel;
+    }
+
+    public dispose(): void {
+        this.outputChannel.dispose();
+    }
+}
 import { openFileAndHighlight } from './search';
 
 /**
@@ -58,11 +83,14 @@ export async function showSearchResults(keywords: string[], results: SearchResul
 
 /**
  * 在输出面板显示详细搜索结果
+ * @param keywords 搜索关键词
+ * @param results 搜索结果
+ * @param autoShow 是否自动显示输出面板，默认为false（不自动显示）
  */
-export function showDetailedResults(keywords: string[], results: SearchResult[]): void {
-    const outputChannel = vscode.window.createOutputChannel('关键词交集搜索');
+export function showDetailedResults(keywords: string[], results: SearchResult[], autoShow: boolean = false): void {
+    const outputChannel = OutputChannelManager.getInstance().getChannel();
     outputChannel.clear();
-    
+
     if (results.length === 0) {
         outputChannel.appendLine(`没有找到同时包含所有关键词的文件:`);
         outputChannel.appendLine(`关键词: [${keywords.join(', ')}]`);
@@ -71,7 +99,11 @@ export function showDetailedResults(keywords: string[], results: SearchResult[])
         outputChannel.appendLine('1. 检查关键词拼写');
         outputChannel.appendLine('2. 尝试减少关键词数量');
         outputChannel.appendLine('3. 检查文件类型配置');
-        outputChannel.show();
+
+        // 只有在明确要求显示时才自动打开输出面板
+        if (autoShow) {
+            outputChannel.show();
+        }
         return;
     }
 
@@ -118,7 +150,10 @@ export function showDetailedResults(keywords: string[], results: SearchResult[])
     const totalSize = results.reduce((sum, result) => sum + result.fileSize, 0);
     outputChannel.appendLine(`- 文件总大小: ${formatFileSize(totalSize)}`);
 
-    outputChannel.show();
+    // 只有在明确要求显示时才自动打开输出面板
+    if (autoShow) {
+        outputChannel.show();
+    }
 }
 
 /**

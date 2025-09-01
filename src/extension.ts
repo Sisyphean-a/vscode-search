@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { searchKeywordsIntersection, openFileAndHighlight } from './search';
-import { showSearchResults, showDetailedResults, SearchResultTreeProvider } from './resultView';
+import { showSearchResults, showDetailedResults, SearchResultTreeProvider, OutputChannelManager } from './resultView';
 import { SearchWebviewPanel } from './webviewPanel';
 
 /**
@@ -69,8 +69,8 @@ export function activate(context: vscode.ExtensionContext) {
                     // 更新树视图
                     treeProvider.updateResults(keywords, results);
 
-                    // 显示详细结果到输出面板
-                    showDetailedResults(keywords, results);
+                    // 显示详细结果到输出面板（命令行方式自动显示）
+                    showDetailedResults(keywords, results, true);
 
                 } catch (error) {
                     console.error('搜索过程中发生错误:', error);
@@ -105,4 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
  */
 export function deactivate() {
     console.log('关键词交集搜索扩展已停用');
+
+    // 清理输出通道
+    OutputChannelManager.getInstance().dispose();
 }

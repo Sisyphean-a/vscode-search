@@ -634,6 +634,65 @@
     color: #212529;
 }
 
+/* 通用样式类 */
+.hidden {
+    display: none;
+}
+
+.text-small {
+    font-size: 12px;
+}
+
+.text-tiny {
+    font-size: 11px;
+}
+
+.margin-top-small {
+    margin-top: 8px;
+}
+
+.margin-top-medium {
+    margin-top: 12px;
+}
+
+.opacity-70 {
+    opacity: 0.7;
+}
+
+.opacity-80 {
+    opacity: 0.8;
+}
+
+.text-error {
+    color: #f44336;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.margin-left-medium {
+    margin-left: 16px;
+}
+
+.margin-top-tiny {
+    margin-top: 4px;
+}
+
+/* 错误提示样式 */
+.error-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #f44336;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 4px;
+    z-index: 1000;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* 滚动条样式 */
 .search-results::-webkit-scrollbar,
 .config-dialog::-webkit-scrollbar {

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { searchKeywordsIntersection } from './search';
 import { SearchResult } from './utils';
-import { showDetailedResults, SearchResultTreeProvider } from './resultView';
+import { showDetailedResults, SearchResultTreeProvider, OutputChannelManager } from './resultView';
 
 /**
  * Webview搜索面板类
@@ -78,6 +78,9 @@ export class SearchWebviewPanel {
                         break;
                     case 'updateConfig':
                         await this._handleUpdateConfig(message.config);
+                        break;
+                    case 'showLog':
+                        await this._handleShowLog();
                         break;
                 }
             },
@@ -161,20 +164,21 @@ export class SearchWebviewPanel {
                         </div>
                     </div>
 
-                    <div class="search-progress" id="searchProgress" style="display: none;">
+                    <div class="search-progress hidden" id="searchProgress">
                         <div class="progress-bar">
                             <div class="progress-fill" id="progressFill"></div>
                         </div>
-                        <div class="progress-text" id="progressText">正在搜索...</div>
+                        <div class="progress-text" id="progressText">准备搜索...</div>
                     </div>
 
-                    <div class="search-stats" id="searchStats" style="display: none;">
+                    <div class="search-stats hidden" id="searchStats">
                         <span id="statsText">找到 0 个文件</span>
                     </div>
 
                     <div class="search-results" id="searchResults">
                         <div class="no-results" id="noResults">
-                            <p>输入关键词开始搜索</p>
+                            <p>💡 输入关键词开始搜索</p>
+                            <p class="text-small margin-top-small opacity-70">支持多个关键词，用空格分隔</p>
                         </div>
                     </div>
 
@@ -183,6 +187,7 @@ export class SearchWebviewPanel {
                             <button id="configBtn" class="action-btn">⚙️ 配置</button>
                             <button id="clearBtn" class="action-btn">🗑️ 清除</button>
                             <button id="exportBtn" class="action-btn" disabled>📤 导出结果</button>
+                            <button id="showLogBtn" class="action-btn" disabled>📋 查看日志</button>
                         </div>
                         <div class="keyboard-shortcuts">
                             <span class="shortcut">Ctrl+Enter</span> 搜索 |
@@ -243,8 +248,8 @@ export class SearchWebviewPanel {
                 vscode.commands.executeCommand('setContext', 'intersectionSearch:hasResults', results.length > 0);
             }
 
-            // 显示详细结果到输出面板
-            showDetailedResults(keywords, results);
+            // 记录详细结果到输出面板（不自动显示）
+            showDetailedResults(keywords, results, false);
 
         } catch (error) {
             console.error('搜索过程中发生错误:', error);
@@ -362,6 +367,12 @@ export class SearchWebviewPanel {
 
             vscode.window.showErrorMessage('配置保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
         }
+    }
+
+    private async _handleShowLog() {
+        // 显示现有的输出面板
+        const outputChannel = OutputChannelManager.getInstance().getChannel();
+        outputChannel.show();
     }
 }
 
