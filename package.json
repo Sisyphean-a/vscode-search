@@ -4,6 +4,10 @@
   "description": "在VSCode中提供多关键词交集搜索功能，快速筛选同时包含所有关键词的文件",
   "version": "1.0.0",
   "publisher": "your-publisher-name",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sisyphean-a/vscode-search.git"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
