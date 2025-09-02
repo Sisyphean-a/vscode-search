@@ -94,6 +94,7 @@ export function getConfiguration() {
             '**/*.map'
         ]),
         caseSensitive: config.get<boolean>('caseSensitive', false),
+        wholeWord: config.get<boolean>('wholeWord', false),
         maxFileSize: config.get<number>('maxFileSize', 1048576), // 1MB
         includePatterns: config.get<string[]>('includePatterns', [
             '**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx',
@@ -107,12 +108,20 @@ export function getConfiguration() {
 }
 
 /**
+ * 转义正则表达式特殊字符
+ */
+function escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * 检查文件是否包含所有关键词
  */
 export async function containsAllKeywords(
     filePath: string,
     keywords: string[],
-    caseSensitive: boolean = false
+    caseSensitive: boolean = false,
+    wholeWord: boolean = false
 ): Promise<SearchResult | null> {
     try {
         // 检查文件大小
@@ -143,13 +152,24 @@ export async function containsAllKeywords(
         
         for (const originalKeyword of keywords) {
             const searchKeyword = caseSensitive ? originalKeyword : originalKeyword.toLowerCase();
-            
-            if (!searchContent.includes(searchKeyword)) {
+
+            // 检查是否包含关键词（考虑全字匹配）
+            let hasKeyword = false;
+            if (wholeWord) {
+                // 全字匹配：使用正则表达式检查
+                const wordRegex = new RegExp(`\\b${escapeRegExp(searchKeyword)}\\b`, caseSensitive ? 'g' : 'gi');
+                hasKeyword = wordRegex.test(searchContent);
+            } else {
+                // 普通匹配：简单包含检查
+                hasKeyword = searchContent.includes(searchKeyword);
+            }
+
+            if (!hasKeyword) {
                 return null; // 不包含某个关键词，直接返回
             }
-            
+
             // 找到所有匹配位置
-            const positions = findKeywordPositions(lines, originalKeyword, caseSensitive);
+            const positions = findKeywordPositions(lines, originalKeyword, caseSensitive, wholeWord);
             if (positions.length > 0) {
                 allMatches.push({
                     keyword: originalKeyword,
@@ -192,29 +212,47 @@ export async function containsAllKeywords(
 function findKeywordPositions(
     lines: string[],
     keyword: string,
-    caseSensitive: boolean
+    caseSensitive: boolean,
+    wholeWord: boolean = false
 ): MatchPosition[] {
     const positions: MatchPosition[] = [];
-    const searchKeyword = caseSensitive ? keyword : keyword.toLowerCase();
-    
+
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
         const line = lines[lineIndex];
-        const searchLine = caseSensitive ? line : line.toLowerCase();
-        
-        let columnIndex = 0;
-        while (true) {
-            const foundIndex = searchLine.indexOf(searchKeyword, columnIndex);
-            if (foundIndex === -1) {
-                break;
+
+        if (wholeWord) {
+            // 全字匹配：使用正则表达式
+            const flags = caseSensitive ? 'g' : 'gi';
+            const regex = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, flags);
+            let match;
+
+            while ((match = regex.exec(line)) !== null) {
+                positions.push({
+                    line: lineIndex + 1, // VSCode使用1基索引
+                    column: match.index + 1,
+                    lineText: line.trim()
+                });
             }
-            
-            positions.push({
-                line: lineIndex + 1, // VSCode使用1基索引
-                column: foundIndex + 1,
-                lineText: line.trim()
-            });
-            
-            columnIndex = foundIndex + 1;
+        } else {
+            // 普通匹配：简单字符串搜索
+            const searchKeyword = caseSensitive ? keyword : keyword.toLowerCase();
+            const searchLine = caseSensitive ? line : line.toLowerCase();
+
+            let columnIndex = 0;
+            while (true) {
+                const foundIndex = searchLine.indexOf(searchKeyword, columnIndex);
+                if (foundIndex === -1) {
+                    break;
+                }
+
+                positions.push({
+                    line: lineIndex + 1, // VSCode使用1基索引
+                    column: foundIndex + 1,
+                    lineText: line.trim()
+                });
+
+                columnIndex = foundIndex + 1;
+            }
         }
     }
     
@@ -341,12 +379,7 @@ function highlightKeywords(content: string, keywords: string[], startLine: numbe
     return highlighted;
 }
 
-/**
- * 转义正则表达式特殊字符
- */
-function escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+
 
 /**
  * 获取指定范围内匹配的关键词

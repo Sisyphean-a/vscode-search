@@ -55,6 +55,7 @@ export async function searchKeywordsIntersection(
             allFiles,
             keywords,
             config.caseSensitive,
+            config.wholeWord,
             progress,
             token
         );
@@ -121,6 +122,7 @@ async function searchFilesInParallel(
     files: vscode.Uri[],
     keywords: string[],
     caseSensitive: boolean,
+    wholeWord: boolean,
     progress: vscode.Progress<{ message?: string; increment?: number }>,
     token: vscode.CancellationToken
 ): Promise<SearchResult[]> {
@@ -151,7 +153,8 @@ async function searchFilesInParallel(
                     return await containsAllKeywords(
                         file.fsPath,
                         keywords,
-                        caseSensitive
+                        caseSensitive,
+                        wholeWord
                     );
                 } catch (error) {
                     console.error(`搜索文件失败: ${file.fsPath}`, error);
@@ -196,6 +199,7 @@ async function smartBatchProcess(
     files: vscode.Uri[],
     keywords: string[],
     caseSensitive: boolean,
+    wholeWord: boolean,
     progress: vscode.Progress<{ message?: string; increment?: number }>,
     token: vscode.CancellationToken
 ): Promise<SearchResult[]> {
@@ -225,6 +229,7 @@ async function smartBatchProcess(
             smallFiles,
             keywords,
             caseSensitive,
+            wholeWord,
             progress,
             token
         );
@@ -665,7 +670,7 @@ async function generateDetailedResult(
         }
 
         // 直接使用containsAllKeywords函数，它会返回完整的SearchResult（包括预览）
-        const result = await containsAllKeywords(filePath, keywords, config.caseSensitive);
+        const result = await containsAllKeywords(filePath, keywords, config.caseSensitive, config.wholeWord);
         return result;
     } catch (error) {
         console.error(`处理文件 ${filePath} 时出错:`, error);

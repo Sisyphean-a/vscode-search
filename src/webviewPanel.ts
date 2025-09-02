@@ -165,6 +165,11 @@ export class SearchWebviewPanel {
                                 <span class="checkmark"></span>
                                 包含子目录
                             </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="wholeWord" />
+                                <span class="checkmark"></span>
+                                全字匹配 (Alt+W)
+                            </label>
                         </div>
                     </div>
 
@@ -178,13 +183,6 @@ export class SearchWebviewPanel {
                     <div class="search-stats hidden" id="searchStats">
                         <div class="stats-compact-row">
                             <span id="statsText">找到 0 个文件</span>
-                            <div class="batch-actions-inline" id="batchActions">
-                                <button id="selectAllBtn" class="action-btn-small">全选</button>
-                                <button id="copySelectedBtn" class="action-btn-small" disabled>复制选中路径</button>
-                                <button id="openSelectedBtn" class="action-btn-small" disabled>打开选中文件</button>
-                                <button id="layoutToggleBtn" class="action-btn-small" title="切换布局">⚏ 左右</button>
-                                <span id="selectedCount" class="selected-count">已选择 0 个文件</span>
-                            </div>
                         </div>
                     </div>
 
@@ -222,7 +220,6 @@ export class SearchWebviewPanel {
                                     <option value="older">更早</option>
                                 </select>
                                 <input type="number" id="minMatchesFilter" class="filter-input-small" placeholder="最少匹配数" min="1">
-                                <button id="applyFilters" class="action-btn-small">应用</button>
                                 <button id="clearFilters" class="action-btn-small">清除</button>
                             </div>
                         </div>
@@ -259,8 +256,6 @@ export class SearchWebviewPanel {
                         <div class="action-buttons">
                             <button id="configBtn" class="action-btn">⚙️ 配置</button>
                             <button id="clearBtn" class="action-btn">🗑️ 清除</button>
-                            <button id="exportBtn" class="action-btn" disabled>📤 导出结果</button>
-                            <button id="showLogBtn" class="action-btn" disabled>📋 查看日志</button>
                         </div>
 
                         <div class="keyboard-shortcuts">
@@ -393,6 +388,7 @@ export class SearchWebviewPanel {
             command: 'configData',
             config: {
                 caseSensitive: config.get('caseSensitive', false),
+                wholeWord: config.get('wholeWord', false),
                 maxFileSize: config.get('maxFileSize', 1048576),
                 includePatterns: config.get('includePatterns', []),
                 ignorePatterns: config.get('ignorePatterns', [])

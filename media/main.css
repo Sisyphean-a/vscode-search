@@ -994,60 +994,9 @@
     flex-wrap: wrap;
 }
 
-/* 批量操作样式 */
-.batch-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
 
-/* 内联批量操作样式 */
-.batch-actions-inline {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
 
-/* 布局样式 */
-.layout-horizontal .result-item {
-    display: flex;
-    flex-direction: row;
-    gap: 16px;
-    align-items: flex-start;
-}
 
-.layout-horizontal .result-item .result-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.layout-horizontal .result-preview {
-    flex: 1;
-    max-width: 45%;
-    min-width: 300px;
-    border-left: 2px solid var(--vscode-panel-border);
-    padding-left: 16px;
-    background: var(--vscode-editor-background);
-    border-radius: 4px;
-    padding: 12px;
-}
-
-.layout-vertical .result-item {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.layout-vertical .result-preview {
-    border-top: 2px solid var(--vscode-panel-border);
-    padding-top: 12px;
-    margin-top: 12px;
-    background: var(--vscode-editor-background);
-    border-radius: 4px;
-    padding: 12px;
-}
 
 /* 改进结果项的整体样式 */
 .result-item {
@@ -1217,17 +1166,7 @@
         gap: 8px;
     }
 
-    .batch-actions {
-        align-self: stretch;
-        justify-content: flex-start;
-        gap: 4px;
-    }
 
-    .batch-actions-inline {
-        align-self: stretch;
-        justify-content: flex-start;
-        gap: 4px;
-    }
 
     /* 在小屏幕上将matches和info垂直排列 */
     .result-matches-and-info {

@@ -6,6 +6,7 @@ let keywordsInput;
 let searchBtn;
 let caseSensitiveCheckbox;
 let includeSubdirsCheckbox;
+let wholeWordCheckbox;
 let searchProgress;
 let progressFill;
 let progressText;
@@ -15,8 +16,6 @@ let searchResults;
 let noResults;
 let configBtn;
 let clearBtn;
-let exportBtn;
-let showLogBtn;
 
 // 过滤相关元素
 let filterSection;
@@ -26,16 +25,9 @@ let fileTypeFilter;
 let fileSizeFilter;
 let modifiedTimeFilter;
 let minMatchesFilter;
-let applyFilters;
 let clearFilters;
 
-// 批量操作相关元素
-let batchActions;
-let selectAllBtn;
-let copySelectedBtn;
-let openSelectedBtn;
-let layoutToggleBtn;
-let selectedCount;
+
 
 // 分页相关元素
 let paginationSection;
@@ -54,30 +46,33 @@ let currentResults = [];
 let currentKeywords = [];
 let isSearching = false;
 let filteredResults = [];
+
+// 搜索缓存
+let searchCache = {
+    keywords: [],
+    results: [],
+    timestamp: 0
+};
 let activeFilters = {
     fileType: '',
     fileSize: '',
     modifiedTime: '',
     minMatches: 0
 };
-let selectedFiles = new Set();
-let isSelectAllMode = false;
+
 
 // 分页相关状态
 let currentPage = 1;
 let pageSize = 20; // 每页显示的文件数量
 let totalPages = 1;
 
-// 布局相关状态
-let isHorizontalLayout = false; // true: 左右布局, false: 上下布局
+
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializeElements();
     setupEventListeners();
     loadConfiguration();
-    updateLayoutToggleButton();
-    applyLayout();
 });
 
 function initializeElements() {
@@ -85,6 +80,7 @@ function initializeElements() {
     searchBtn = document.getElementById('searchBtn');
     caseSensitiveCheckbox = document.getElementById('caseSensitive');
     includeSubdirsCheckbox = document.getElementById('includeSubdirs');
+    wholeWordCheckbox = document.getElementById('wholeWord');
     searchProgress = document.getElementById('searchProgress');
     progressFill = document.getElementById('progressFill');
     progressText = document.getElementById('progressText');
@@ -94,8 +90,6 @@ function initializeElements() {
     noResults = document.getElementById('noResults');
     configBtn = document.getElementById('configBtn');
     clearBtn = document.getElementById('clearBtn');
-    exportBtn = document.getElementById('exportBtn');
-    showLogBtn = document.getElementById('showLogBtn');
 
     // 过滤相关元素
     filterSection = document.getElementById('filterSection');
@@ -105,16 +99,9 @@ function initializeElements() {
     fileSizeFilter = document.getElementById('fileSizeFilter');
     modifiedTimeFilter = document.getElementById('modifiedTimeFilter');
     minMatchesFilter = document.getElementById('minMatchesFilter');
-    applyFilters = document.getElementById('applyFilters');
     clearFilters = document.getElementById('clearFilters');
 
-    // 批量操作相关元素
-    batchActions = document.getElementById('batchActions');
-    selectAllBtn = document.getElementById('selectAllBtn');
-    copySelectedBtn = document.getElementById('copySelectedBtn');
-    openSelectedBtn = document.getElementById('openSelectedBtn');
-    layoutToggleBtn = document.getElementById('layoutToggleBtn');
-    selectedCount = document.getElementById('selectedCount');
+
 
     // 分页相关元素
     paginationSection = document.getElementById('paginationSection');
@@ -156,6 +143,17 @@ function setupEventListeners() {
         });
     }
 
+    if (wholeWordCheckbox) {
+        wholeWordCheckbox.addEventListener('change', function() {
+            vscode.postMessage({
+                command: 'updateConfig',
+                config: {
+                    wholeWord: wholeWordCheckbox.checked
+                }
+            });
+        });
+    }
+
     // 清除按钮
     if (clearBtn) {
         clearBtn.addEventListener('click', function() {
@@ -174,29 +172,9 @@ function setupEventListeners() {
         });
     }
 
-    // 导出按钮
-    if (exportBtn) {
-        exportBtn.addEventListener('click', function() {
-            exportResults();
-        });
-    }
 
-    // 查看日志按钮
-    if (showLogBtn) {
-        showLogBtn.addEventListener('click', function() {
-            vscode.postMessage({
-                command: 'showLog'
-            });
-        });
-    }
 
     // 过滤功能事件监听器 - 移除toggleFilters功能，因为没有高级选项
-
-    if (applyFilters) {
-        applyFilters.addEventListener('click', function() {
-            applyCurrentFilters();
-        });
-    }
 
     if (clearFilters) {
         clearFilters.addEventListener('click', function() {
@@ -223,33 +201,7 @@ function setupEventListeners() {
         });
     }
 
-    // 批量操作事件监听器
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function() {
-            toggleSelectAll();
-        });
-    }
 
-    if (copySelectedBtn) {
-        copySelectedBtn.addEventListener('click', function() {
-            copySelectedPaths();
-        });
-    }
-
-    if (openSelectedBtn) {
-        openSelectedBtn.addEventListener('click', function() {
-            openSelectedFiles();
-        });
-    }
-
-    // 布局切换按钮
-    if (layoutToggleBtn) {
-        layoutToggleBtn.addEventListener('click', function() {
-            isHorizontalLayout = !isHorizontalLayout;
-            updateLayoutToggleButton();
-            applyLayout();
-        });
-    }
 
     // 分页事件监听器
     if (pageSizeSelect) {
@@ -295,19 +247,120 @@ function setupEventListeners() {
 
 }
 
+/**
+ * 检查搜索缓存是否可用于增量搜索
+ */
+function checkSearchCache(keywords) {
+    // 如果没有缓存，不能使用
+    if (!searchCache.keywords.length || !searchCache.results.length) {
+        return { canUseCache: false };
+    }
+
+    // 检查缓存是否过期（5分钟）
+    const cacheAge = Date.now() - searchCache.timestamp;
+    if (cacheAge > 5 * 60 * 1000) {
+        return { canUseCache: false };
+    }
+
+    // 检查新关键词是否是缓存关键词的超集（增量搜索）
+    const cachedKeywords = searchCache.keywords;
+    const isIncremental = cachedKeywords.length < keywords.length &&
+                         cachedKeywords.every(keyword => keywords.includes(keyword));
+
+    if (isIncremental) {
+        return {
+            canUseCache: true,
+            cachedResults: searchCache.results,
+            newKeywords: keywords.filter(k => !cachedKeywords.includes(k))
+        };
+    }
+
+    return { canUseCache: false };
+}
+
+/**
+ * 处理增量搜索
+ */
+function handleIncrementalSearch(keywords, cachedResults) {
+    // 显示正在进行增量搜索的提示
+    showNotification('使用缓存进行增量搜索...', 'info');
+
+    // 在缓存结果中进行客户端过滤
+    const filteredResults = cachedResults.filter(result => {
+        // 检查是否包含所有新关键词
+        return keywords.every(keyword => {
+            const searchText = caseSensitiveCheckbox.checked ?
+                result.relativePath + ' ' + (result.preview?.snippets?.map(s => s.content).join(' ') || '') :
+                (result.relativePath + ' ' + (result.preview?.snippets?.map(s => s.content).join(' ') || '')).toLowerCase();
+
+            const searchKeyword = caseSensitiveCheckbox.checked ? keyword : keyword.toLowerCase();
+
+            if (wholeWordCheckbox.checked) {
+                const regex = new RegExp(`\\b${escapeRegExp(searchKeyword)}\\b`, caseSensitiveCheckbox.checked ? 'g' : 'gi');
+                return regex.test(searchText);
+            } else {
+                return searchText.includes(searchKeyword);
+            }
+        });
+    });
+
+    // 更新缓存
+    updateSearchCache(keywords, filteredResults);
+
+    // 显示结果
+    handleSearchCompleted(filteredResults, keywords);
+}
+
+/**
+ * 更新搜索缓存
+ */
+function updateSearchCache(keywords, results) {
+    searchCache = {
+        keywords: [...keywords],
+        results: [...results],
+        timestamp: Date.now()
+    };
+}
+
+/**
+ * 清除搜索缓存
+ */
+function clearSearchCache() {
+    searchCache = {
+        keywords: [],
+        results: [],
+        timestamp: 0
+    };
+}
+
+/**
+ * 转义正则表达式特殊字符
+ */
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function handleSearch() {
     const keywords = keywordsInput.value.trim();
     if (!keywords) {
         showError('请输入至少一个关键词');
         return;
     }
-    
+
     if (isSearching) {
         return;
     }
-    
+
     const keywordArray = keywords.split(/\s+/).filter(k => k.length > 0);
-    
+
+    // 检查是否可以使用缓存进行增量搜索
+    const cacheResult = checkSearchCache(keywordArray);
+    if (cacheResult.canUseCache) {
+        // 使用缓存结果进行增量搜索
+        handleIncrementalSearch(keywordArray, cacheResult.cachedResults);
+        return;
+    }
+
     vscode.postMessage({
         command: 'search',
         keywords: keywordArray
@@ -338,8 +391,9 @@ function clearResults() {
         </div>
     `;
     searchStats.classList.add('hidden');
-    exportBtn.disabled = true;
-    showLogBtn.disabled = true;
+
+    // 清除搜索缓存
+    clearSearchCache();
 }
 
 function loadConfiguration() {
@@ -348,36 +402,7 @@ function loadConfiguration() {
     });
 }
 
-function exportResults() {
-    if (currentResults.length === 0) {
-        return;
-    }
-    
-    const exportData = {
-        keywords: currentKeywords,
-        timestamp: new Date().toISOString(),
-        results: currentResults.map(result => ({
-            path: result.relativePath,
-            matches: result.matches.map(match => ({
-                keyword: match.keyword,
-                count: match.positions.length
-            }))
-        }))
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: 'application/json'
-    });
-    
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `search-results-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
+
 
 // 监听来自扩展的消息
 window.addEventListener('message', event => {
@@ -481,14 +506,14 @@ function handleSearchCompleted(results, keywords) {
     // 恢复输入框样式
     keywordsInput.style.borderColor = '';
 
+    // 更新搜索缓存
+    updateSearchCache(keywords, results);
+
     displayResults(results, keywords);
 
     // 显示完成通知
     if (results.length > 0) {
         showNotification(`找到 ${results.length} 个匹配文件`, 'success');
-        showLogBtn.disabled = false; // 有结果时启用查看日志按钮
-    } else {
-        showLogBtn.disabled = true;
     }
 }
 
@@ -516,11 +541,13 @@ function handleSearchError(message) {
 
 function handleConfigData(config) {
     caseSensitiveCheckbox.checked = config.caseSensitive || false;
+    wholeWordCheckbox.checked = config.wholeWord || false;
 
     // 如果配置对话框打开，更新对话框中的值
     const dialog = document.querySelector('.config-dialog-overlay');
     if (dialog) {
         document.getElementById('configCaseSensitive').checked = config.caseSensitive || false;
+        document.getElementById('configWholeWord').checked = config.wholeWord || false;
         document.getElementById('configMaxFileSize').value = ((config.maxFileSize || 1048576) / 1024 / 1024).toFixed(1);
         document.getElementById('configIncludePatterns').value = (config.includePatterns || []).join(', ');
         document.getElementById('configIgnorePatterns').value = (config.ignorePatterns || []).join(', ');
@@ -557,8 +584,6 @@ function displayResults(results, keywords) {
         `;
         searchStats.classList.add('hidden');
         filterSection.classList.add('hidden');
-        exportBtn.disabled = true;
-        showLogBtn.disabled = true;
         return;
     }
 
@@ -572,11 +597,8 @@ function displayResults(results, keywords) {
 
     updateStatsText(results.length, totalMatches);
     searchStats.classList.remove('hidden');
-    exportBtn.disabled = false;
 
-    // 显示批量操作控件
-    batchActions.classList.remove('hidden');
-    updateBatchActionButtons();
+
 
     // 按目录分组显示结果
     const groupedResults = groupResultsByDirectory(results);
@@ -629,7 +651,7 @@ function generateGroupedResultsHtml(groupedResults, keywords) {
                     <div class="result-content">
                         <div class="result-file-header">
                             <div class="result-file">
-                                <input type="checkbox" class="file-checkbox" data-file-path="${escapeHtml(result.filePath)}" title="选择文件">
+
                                 <span class="result-file-icon">${getFileIcon(result.relativePath)}</span>
                                 <span class="result-file-name">${escapeHtml(getFileName(result.relativePath))}</span>
                                 <span class="result-file-matches-count">(${totalFileMatches})</span>
@@ -679,8 +701,8 @@ function addResultClickHandlers(keywords) {
         let clickTimer = null;
 
         item.addEventListener('click', function(e) {
-            // 如果点击的是复选框或按钮，不处理
-            if (e.target.matches('.file-checkbox, .copy-path, button, input, select')) {
+            // 如果点击的是按钮，不处理
+            if (e.target.matches('.copy-path, button, input, select')) {
                 return;
             }
 
@@ -718,14 +740,7 @@ function addResultClickHandlers(keywords) {
         });
     });
 
-    // 文件复选框
-    searchResults.querySelectorAll('.file-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function(e) {
-            e.stopPropagation();
-            const filePath = this.getAttribute('data-file-path');
-            handleFileSelection(filePath, this.checked);
-        });
-    });
+
 }
 
 function getFileIcon(filePath) {
@@ -1008,100 +1023,12 @@ function getActiveFilterInfo() {
     return activeFilterNames.length > 0 ? `[已过滤: ${activeFilterNames.join(', ')}]` : '';
 }
 
-/**
- * 切换全选状态
- */
-function toggleSelectAll() {
-    if (isSelectAllMode) {
-        // 取消全选
-        selectedFiles.clear();
-        isSelectAllMode = false;
-        if (selectAllBtn) {
-            selectAllBtn.textContent = '全选';
-        }
-    } else {
-        // 全选
-        selectedFiles.clear();
-        filteredResults.forEach(result => {
-            selectedFiles.add(result.filePath);
-        });
-        isSelectAllMode = true;
-        if (selectAllBtn) {
-            selectAllBtn.textContent = '取消全选';
-        }
-    }
 
-    updateSelectionUI();
-    updateBatchActionButtons();
-}
 
-/**
- * 复制选中的文件路径
- */
-function copySelectedPaths() {
-    if (selectedFiles.size === 0) {
-        showNotification('请先选择要复制的文件', 'warning');
-        return;
-    }
 
-    const paths = Array.from(selectedFiles);
-    const pathText = paths.join('\n');
 
-    copyToClipboard(pathText);
-    showNotification(`已复制 ${paths.length} 个文件路径到剪贴板`, 'success');
-}
 
-/**
- * 打开选中的文件
- */
-function openSelectedFiles() {
-    if (selectedFiles.size === 0) {
-        showNotification('请先选择要打开的文件', 'warning');
-        return;
-    }
 
-    if (selectedFiles.size > 10) {
-        if (!confirm(`确定要打开 ${selectedFiles.size} 个文件吗？这可能会影响性能。`)) {
-            return;
-        }
-    }
-
-    Array.from(selectedFiles).forEach(filePath => {
-        vscode.postMessage({
-            command: 'openFile',
-            filePath: filePath,
-            keywords: currentKeywords
-        });
-    });
-
-    showNotification(`正在打开 ${selectedFiles.size} 个文件...`, 'info');
-}
-
-/**
- * 更新布局切换按钮文本
- */
-function updateLayoutToggleButton() {
-    if (layoutToggleBtn) {
-        layoutToggleBtn.innerHTML = isHorizontalLayout ? '⚏ 上下' : '⚏ 左右';
-        layoutToggleBtn.title = isHorizontalLayout ? '切换到上下布局' : '切换到左右布局';
-    }
-}
-
-/**
- * 应用布局样式
- */
-function applyLayout() {
-    const searchResults = document.getElementById('searchResults');
-    if (searchResults) {
-        if (isHorizontalLayout) {
-            searchResults.classList.add('layout-horizontal');
-            searchResults.classList.remove('layout-vertical');
-        } else {
-            searchResults.classList.add('layout-vertical');
-            searchResults.classList.remove('layout-horizontal');
-        }
-    }
-}
 
 /**
  * 切换文件预览
@@ -1118,53 +1045,9 @@ function togglePreview(resultItem) {
     }
 }
 
-/**
- * 更新选择状态的UI
- */
-function updateSelectionUI() {
-    // 更新所有复选框状态
-    const checkboxes = searchResults.querySelectorAll('.file-checkbox');
 
-    checkboxes.forEach(checkbox => {
-        const filePath = checkbox.getAttribute('data-file-path');
-        const shouldBeChecked = selectedFiles.has(filePath);
-        checkbox.checked = shouldBeChecked;
-    });
-}
 
-/**
- * 更新批量操作按钮状态
- */
-function updateBatchActionButtons() {
-    const selectedFileCount = selectedFiles.size;
 
-    copySelectedBtn.disabled = selectedFileCount === 0;
-    openSelectedBtn.disabled = selectedFileCount === 0;
-
-    selectedCount.textContent = `已选择 ${selectedFileCount} 个文件`;
-
-    // 显示或隐藏批量操作区域
-    if (selectedFileCount > 0 || filteredResults.length > 0) {
-        batchActions.classList.remove('hidden');
-    } else {
-        batchActions.classList.add('hidden');
-    }
-}
-
-/**
- * 处理单个文件选择
- */
-function handleFileSelection(filePath, isSelected) {
-    if (isSelected) {
-        selectedFiles.add(filePath);
-    } else {
-        selectedFiles.delete(filePath);
-        isSelectAllMode = false;
-        selectAllBtn.textContent = '全选';
-    }
-
-    updateBatchActionButtons();
-}
 
 /**
  * 更新分页结果显示
@@ -1203,8 +1086,7 @@ function displayPageResults(results, keywords) {
     // 添加点击事件
     addResultClickHandlers(keywords);
 
-    // 更新选择状态
-    updateSelectionUI();
+
 }
 
 /**
@@ -1484,6 +1366,16 @@ function addKeyboardShortcuts() {
             e.preventDefault();
             keywordsInput.focus();
             keywordsInput.select();
+        }
+
+        // Alt+W 切换全字匹配
+        if (e.altKey && e.key === 'w') {
+            e.preventDefault();
+            if (wholeWordCheckbox) {
+                wholeWordCheckbox.checked = !wholeWordCheckbox.checked;
+                // 触发change事件以保存配置
+                wholeWordCheckbox.dispatchEvent(new Event('change'));
+            }
         }
     });
 }
