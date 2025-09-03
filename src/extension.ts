@@ -69,8 +69,8 @@ export function activate(context: vscode.ExtensionContext) {
                     // 更新树视图
                     treeProvider.updateResults(keywords, results);
 
-                    // 显示详细结果到输出面板（命令行方式自动显示）
-                    showDetailedResults(keywords, results, true);
+                    // 显示详细结果到输出面板（不自动显示）
+                    showDetailedResults(keywords, results, false);
 
                 } catch (error) {
                     console.error('搜索过程中发生错误:', error);

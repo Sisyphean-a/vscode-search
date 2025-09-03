@@ -95,9 +95,9 @@ export function getConfiguration() {
         ]),
         caseSensitive: config.get<boolean>('caseSensitive', false),
         wholeWord: config.get<boolean>('wholeWord', false),
-        maxFileSize: config.get<number>('maxFileSize', 1048576), // 1MB
+        maxFileSize: config.get<number>('maxFileSize', 1024), // 1024KB
         includePatterns: config.get<string[]>('includePatterns', [
-            '**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx',
+            '**/*.js', '**/*.ts', '**/*.jsx', '**/*.jsp', '**/*.tsx',
             '**/*.vue', '**/*.html', '**/*.css', '**/*.scss',
             '**/*.less', '**/*.json', '**/*.md', '**/*.txt',
             '**/*.py', '**/*.java', '**/*.c', '**/*.cpp',
@@ -128,7 +128,7 @@ export async function containsAllKeywords(
         const stats = await fs.promises.stat(filePath);
         const config = getConfiguration();
         
-        if (stats.size > config.maxFileSize) {
+        if (stats.size > config.maxFileSize * 1024) {
             return null; // 文件太大，跳过
         }
 
@@ -141,7 +141,7 @@ export async function containsAllKeywords(
         }
 
         // 使用流式处理读取文件内容
-        const { content, lines } = await readFileWithStream(filePath, config.maxFileSize);
+        const { content, lines } = await readFileWithStream(filePath, config.maxFileSize * 1024);
         
         // 准备搜索用的关键词
         const searchKeywords = caseSensitive ? keywords : keywords.map(k => k.toLowerCase());
@@ -614,7 +614,7 @@ export async function buildSearchIndex(
         const batch = uniqueFiles.slice(i, i + batchSize);
         const batchPromises = batch.map(async (file) => {
             try {
-                return await indexFile(file.fsPath, config.maxFileSize);
+                return await indexFile(file.fsPath, config.maxFileSize * 1024);
             } catch (error) {
                 console.error(`索引文件失败: ${file.fsPath}`, error);
                 return null;

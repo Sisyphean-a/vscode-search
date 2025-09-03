@@ -84,10 +84,15 @@
           "default": false,
           "description": "是否区分大小写"
         },
+        "intersectionSearch.wholeWord": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否全字匹配"
+        },
         "intersectionSearch.maxFileSize": {
           "type": "number",
-          "default": 1048576,
-          "description": "搜索文件的最大大小（字节），默认1MB"
+          "default": 1024,
+          "description": "搜索文件的最大大小（KB），默认1024KB"
         },
         "intersectionSearch.includePatterns": {
           "type": "array",
@@ -95,6 +100,7 @@
             "**/*.js",
             "**/*.ts",
             "**/*.jsx",
+            "**/*.jsp",
             "**/*.tsx",
             "**/*.vue",
             "**/*.html",

@@ -548,8 +548,29 @@ function handleConfigData(config) {
     if (dialog) {
         document.getElementById('configCaseSensitive').checked = config.caseSensitive || false;
         document.getElementById('configWholeWord').checked = config.wholeWord || false;
-        document.getElementById('configMaxFileSize').value = ((config.maxFileSize || 1048576) / 1024 / 1024).toFixed(1);
-        document.getElementById('configIncludePatterns').value = (config.includePatterns || []).join(', ');
+        document.getElementById('configMaxFileSize').value = config.maxFileSize || 1024;
+
+        // 处理includePatterns，如果为空则使用默认值
+        let includePatterns = config.includePatterns;
+        if (!includePatterns || includePatterns.length === 0) {
+            // 使用默认的文件类型列表
+            includePatterns = [
+                '**/*.js', '**/*.ts', '**/*.jsx','**/*.jsp', '**/*.tsx', '**/*.vue',
+                '**/*.html', '**/*.css', '**/*.scss', '**/*.less', '**/*.json',
+                '**/*.md', '**/*.txt', '**/*.py', '**/*.java', '**/*.c',
+                '**/*.cpp', '**/*.h', '**/*.php', '**/*.rb', '**/*.go',
+                '**/*.rs', '**/*.xml', '**/*.yaml', '**/*.yml'
+            ];
+        }
+
+        // 将 **/*.js 格式转换为 js 格式显示
+        const simplifiedPatterns = includePatterns.map(pattern => {
+            if (pattern.startsWith('**/') && pattern.includes('.')) {
+                return pattern.replace('**/*.', '');
+            }
+            return pattern;
+        });
+        document.getElementById('configIncludePatterns').value = simplifiedPatterns.join(', ');
         document.getElementById('configIgnorePatterns').value = (config.ignorePatterns || []).join(', ');
     }
 }
@@ -749,6 +770,7 @@ function getFileIcon(filePath) {
         'js': '📄',
         'ts': '📘',
         'jsx': '⚛️',
+        'jsp': '⚛️',
         'tsx': '⚛️',
         'vue': '💚',
         'html': '🌐',
@@ -1197,18 +1219,23 @@ function showConfigDialog() {
                         <span class="checkmark"></span>
                         区分大小写
                     </label>
+                    <label class="config-checkbox-label">
+                        <input type="checkbox" id="configWholeWord" />
+                        <span class="checkmark"></span>
+                        全字匹配
+                    </label>
                 </div>
                 <div class="config-section">
                     <h4>文件过滤</h4>
                     <div class="config-input-group">
-                        <label>最大文件大小 (MB):</label>
-                        <input type="number" id="configMaxFileSize" min="0.1" max="100" step="0.1" />
+                        <label>最大文件大小 (KB):</label>
+                        <input type="number" id="configMaxFileSize" min="1" max="102400" step="1" />
                     </div>
                 </div>
                 <div class="config-section">
                     <h4>包含文件类型</h4>
-                    <textarea id="configIncludePatterns" placeholder="**/*.js, **/*.ts, **/*.vue" rows="3"></textarea>
-                    <small>用逗号分隔多个模式</small>
+                    <textarea id="configIncludePatterns" placeholder="例如：js, ts, vue, html, css..." rows="3"></textarea>
+                    <small>用逗号分隔多个文件扩展名</small>
                 </div>
                 <div class="config-section">
                     <h4>忽略文件和目录</h4>
@@ -1226,12 +1253,7 @@ function showConfigDialog() {
 
     document.body.appendChild(dialog);
 
-    // 加载当前配置
-    vscode.postMessage({
-        command: 'getConfig'
-    });
-
-    // 使用setTimeout确保DOM元素完全添加后再绑定事件
+    // 使用setTimeout确保DOM元素完全添加后再绑定事件和加载配置
     setTimeout(() => {
         // 添加事件监听器
         const closeBtn = document.getElementById('configDialogClose');
@@ -1278,6 +1300,11 @@ function showConfigDialog() {
                 closeConfigDialog();
             }
         });
+
+        // 事件绑定完成后，加载当前配置
+        vscode.postMessage({
+            command: 'getConfig'
+        });
     }, 0);
 }
 
@@ -1299,9 +1326,22 @@ function closeConfigDialog() {
 
 function saveConfig() {
     const caseSensitive = document.getElementById('configCaseSensitive').checked;
-    const maxFileSize = parseFloat(document.getElementById('configMaxFileSize').value) * 1024 * 1024; // 转换为字节
+    const wholeWord = document.getElementById('configWholeWord').checked;
+    const maxFileSize = parseInt(document.getElementById('configMaxFileSize').value); // 直接使用KB值
+
+    // 将简化格式转换为完整的glob模式
     const includePatterns = document.getElementById('configIncludePatterns').value
-        .split(',').map(p => p.trim()).filter(p => p.length > 0);
+        .split(',').map(p => {
+            const trimmed = p.trim();
+            if (trimmed.length === 0) return '';
+            // 如果已经是完整格式，直接返回
+            if (trimmed.startsWith('**/') || trimmed.includes('/')) {
+                return trimmed;
+            }
+            // 如果是简化格式（如 js），转换为 **/*.js
+            return `**/*.${trimmed}`;
+        }).filter(p => p.length > 0);
+
     const ignorePatterns = document.getElementById('configIgnorePatterns').value
         .split(',').map(p => p.trim()).filter(p => p.length > 0);
 
@@ -1309,6 +1349,7 @@ function saveConfig() {
         command: 'updateConfig',
         config: {
             caseSensitive,
+            wholeWord,
             maxFileSize,
             includePatterns,
             ignorePatterns
@@ -1321,8 +1362,9 @@ function saveConfig() {
 function resetConfig() {
     // 重置为默认值
     document.getElementById('configCaseSensitive').checked = false;
-    document.getElementById('configMaxFileSize').value = '1';
-    document.getElementById('configIncludePatterns').value = '**/*.js, **/*.ts, **/*.jsx, **/*.tsx, **/*.vue, **/*.html, **/*.css, **/*.scss, **/*.less, **/*.json, **/*.md, **/*.txt, **/*.py, **/*.java, **/*.c, **/*.cpp, **/*.h, **/*.php, **/*.rb, **/*.go, **/*.rs, **/*.xml, **/*.yaml, **/*.yml';
+    document.getElementById('configWholeWord').checked = false;
+    document.getElementById('configMaxFileSize').value = '1024';
+    document.getElementById('configIncludePatterns').value = 'js, ts, jsx, jsp, tsx, vue, html, css, scss, less, json, md, txt, py, java, c, cpp, h, php, rb, go, rs, xml, yaml, yml';
     document.getElementById('configIgnorePatterns').value = '**/node_modules/**, **/.git/**, **/dist/**, **/build/**, **/*.min.js, **/*.map';
 }
 

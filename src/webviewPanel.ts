@@ -195,6 +195,7 @@ export class SearchWebviewPanel {
                                     <option value=".js">JavaScript</option>
                                     <option value=".ts">TypeScript</option>
                                     <option value=".jsx">React JSX</option>
+                                    <option value=".jsp">JSP</option>
                                     <option value=".tsx">React TSX</option>
                                     <option value=".vue">Vue</option>
                                     <option value=".html">HTML</option>
@@ -384,15 +385,16 @@ export class SearchWebviewPanel {
 
     private async _handleGetConfig() {
         const config = vscode.workspace.getConfiguration('intersectionSearch');
+        const configData = {
+            caseSensitive: config.get('caseSensitive'),
+            wholeWord: config.get('wholeWord'),
+            maxFileSize: config.get('maxFileSize'),
+            includePatterns: config.get('includePatterns'),
+            ignorePatterns: config.get('ignorePatterns')
+        };
         this._panel.webview.postMessage({
             command: 'configData',
-            config: {
-                caseSensitive: config.get('caseSensitive', false),
-                wholeWord: config.get('wholeWord', false),
-                maxFileSize: config.get('maxFileSize', 1048576),
-                includePatterns: config.get('includePatterns', []),
-                ignorePatterns: config.get('ignorePatterns', [])
-            }
+            config: configData
         });
     }
 
@@ -403,19 +405,23 @@ export class SearchWebviewPanel {
             const updates: Thenable<void>[] = [];
 
             if (configData.caseSensitive !== undefined) {
-                updates.push(config.update('caseSensitive', configData.caseSensitive, vscode.ConfigurationTarget.Workspace));
+                updates.push(config.update('caseSensitive', configData.caseSensitive, vscode.ConfigurationTarget.Global));
+            }
+
+            if (configData.wholeWord !== undefined) {
+                updates.push(config.update('wholeWord', configData.wholeWord, vscode.ConfigurationTarget.Global));
             }
 
             if (configData.maxFileSize !== undefined) {
-                updates.push(config.update('maxFileSize', configData.maxFileSize, vscode.ConfigurationTarget.Workspace));
+                updates.push(config.update('maxFileSize', configData.maxFileSize, vscode.ConfigurationTarget.Global));
             }
 
             if (configData.includePatterns !== undefined) {
-                updates.push(config.update('includePatterns', configData.includePatterns, vscode.ConfigurationTarget.Workspace));
+                updates.push(config.update('includePatterns', configData.includePatterns, vscode.ConfigurationTarget.Global));
             }
 
             if (configData.ignorePatterns !== undefined) {
-                updates.push(config.update('ignorePatterns', configData.ignorePatterns, vscode.ConfigurationTarget.Workspace));
+                updates.push(config.update('ignorePatterns', configData.ignorePatterns, vscode.ConfigurationTarget.Global));
             }
 
             await Promise.all(updates);
