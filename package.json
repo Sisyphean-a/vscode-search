@@ -3,17 +3,33 @@
   "displayName": "关键词交集搜索",
   "description": "在VSCode中提供多关键词交集搜索功能，快速筛选同时包含所有关键词的文件",
   "version": "1.0.0",
-  "publisher": "your-publisher-name",
+  "publisher": "xixifu",
+  "author": {
+    "name": "Xavier Nico",
+    "email": "xia362108178@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Sisyphean-a/vscode-search#readme",
+  "bugs": {
+    "url": "https://github.com/Sisyphean-a/vscode-search/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Sisyphean-a/vscode-search.git"
   },
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Snippets"
   ],
+
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "keywords": [
     "search",
     "intersection",
@@ -21,10 +37,7 @@
     "文件搜索",
     "关键词"
   ],
-  "activationEvents": [
-    "onCommand:intersectionSearch.searchKeywords",
-    "onCommand:intersectionSearch.openWebview"
-  ],
+
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -51,7 +64,8 @@
         {
           "id": "intersectionSearchResults",
           "name": "关键词交集搜索结果",
-          "when": "intersectionSearch:hasResults"
+          "when": "intersectionSearch:hasResults",
+          "icon": "$(search)"
         }
       ]
     },
